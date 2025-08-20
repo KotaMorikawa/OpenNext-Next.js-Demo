@@ -1,24 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js v15 Feature Demo
+
+Next.js v15の機能をSST (Serverless Stack)でAWSにデプロイし、各機能の検証を行うデモプロジェクト。
+
+## Tech Stack
+
+- **Next.js 15.5.0** (App Router + Turbopack)
+- **React 19** (Server/Client Components)
+- **TypeScript 5**
+- **PostgreSQL** (Drizzle ORM)
+- **SST 3.17.10** (AWS デプロイ)
+- **Vitest + Playwright** (テスト)
 
 ## Getting Started
 
-First, run the development server:
+### 1. 環境変数の設定
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. データベースの起動
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# PostgreSQL を Docker で起動
+npm run db:up
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# データベースログの確認
+npm run db:logs
+```
+
+### 3. 開発サーバーの起動
+
+```bash
+# Next.js 開発サーバー起動
+npm run dev
+```
+
+### 4. その他のコマンド
+
+```bash
+# テスト実行
+npm run test              # Vitest
+npm run test:ui           # Vitest UI
+npm run test:e2e          # Playwright E2E
+
+# データベース管理
+npm run db:studio         # Drizzle Studio (GUI)
+npm run db:push           # スキーマ適用
+
+# コード品質
+npm run lint              # Biome リント
+npm run typecheck         # TypeScript 型チェック
+```
+
+## Project Structure
+
+```
+src/
+├── app/                 # App Router (Next.js 15)
+├── lib/
+│   ├── db/             # Database (Drizzle ORM)
+│   └── ...
+├── components/         # React コンポーネント
+└── ...
+
+scripts/                # データベース初期化
+test/                   # テスト設定
+TASK.md                # 機能検証タスクリスト
+```
 
 ## Learn More
 
@@ -28,9 +77,3 @@ To learn more about Next.js, take a look at the following resources:
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
