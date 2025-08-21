@@ -2,7 +2,7 @@ import DataLoader from "dataloader";
 import { desc, eq, inArray } from "drizzle-orm";
 import * as React from "react";
 import { db } from "@/lib/db";
-import { comments, users } from "@/lib/db/schema";
+import { comments, user } from "@/lib/db/schema";
 
 // 投稿IDから全コメントを取得（著者情報付き）
 async function batchGetCommentsByPostIds(postIds: readonly string[]) {
@@ -11,10 +11,10 @@ async function batchGetCommentsByPostIds(postIds: readonly string[]) {
   const fetchedComments = await db
     .select({
       comment: comments,
-      author: users,
+      author: user,
     })
     .from(comments)
-    .leftJoin(users, eq(comments.userId, users.id))
+    .leftJoin(user, eq(comments.userId, user.id))
     .where(inArray(comments.postId, [...postIds]))
     .orderBy(desc(comments.createdAt));
 
@@ -61,10 +61,10 @@ async function batchGetCommentsById(commentIds: readonly string[]) {
   const fetchedComments = await db
     .select({
       comment: comments,
-      author: users,
+      author: user,
     })
     .from(comments)
-    .leftJoin(users, eq(comments.userId, users.id))
+    .leftJoin(user, eq(comments.userId, user.id))
     .where(inArray(comments.id, [...commentIds]));
 
   // IDの順序を保持しながら結果をマップ

@@ -2,7 +2,7 @@ import DataLoader from "dataloader";
 import { eq, inArray } from "drizzle-orm";
 import * as React from "react";
 import { db } from "@/lib/db";
-import { userProfiles, users } from "@/lib/db/schema";
+import { user, userProfiles } from "@/lib/db/schema";
 
 // ユーザー情報のバッチ取得関数
 async function batchGetUsers(userIds: readonly string[]) {
@@ -10,8 +10,8 @@ async function batchGetUsers(userIds: readonly string[]) {
 
   const fetchedUsers = await db
     .select()
-    .from(users)
-    .where(inArray(users.id, [...userIds]));
+    .from(user)
+    .where(inArray(user.id, [...userIds]));
 
   // IDの順序を保持しながら結果をマップ
   return userIds.map(
@@ -40,12 +40,12 @@ async function batchGetUsersWithProfiles(userIds: readonly string[]) {
 
   const fetchedUsers = await db
     .select({
-      user: users,
+      user: user,
       profile: userProfiles,
     })
-    .from(users)
-    .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
-    .where(inArray(users.id, [...userIds]));
+    .from(user)
+    .leftJoin(userProfiles, eq(user.id, userProfiles.userId))
+    .where(inArray(user.id, [...userIds]));
 
   // IDの順序を保持しながら結果をマップ
   return userIds.map((id) => {
