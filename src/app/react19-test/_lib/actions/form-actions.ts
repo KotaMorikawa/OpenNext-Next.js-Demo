@@ -10,11 +10,6 @@ import { items, messages, posts, users } from "@/lib/db/schema";
 const UserRegistrationSchema = z.object({
   name: z.string().min(2, "名前は2文字以上で入力してください").trim(),
   email: z.string().email("有効なメールアドレスを入力してください").trim(),
-  age: z
-    .number({ coerce: true, message: "有効な数値を入力してください" })
-    .int("整数値を入力してください")
-    .min(0, "年齢は0以上で入力してください")
-    .max(150, "年齢は150以下で入力してください"),
 });
 
 const MessageSchema = z.object({
@@ -46,7 +41,6 @@ export async function registerUser(
     const rawData = {
       name: formData.get("name") as string,
       email: formData.get("email") as string,
-      age: formData.get("age") as string,
     };
 
     // Zodによるバリデーション
@@ -54,7 +48,7 @@ export async function registerUser(
 
     if (!result.success) {
       const errors: Record<string, string> = {};
-      result.error.errors.forEach((error) => {
+      result.error.issues.forEach((error) => {
         if (error.path.length > 0) {
           errors[error.path[0] as string] = error.message;
         }
@@ -73,9 +67,10 @@ export async function registerUser(
     const [insertedUser] = await db
       .insert(users)
       .values({
+        id: crypto.randomUUID(),
         name: validatedData.name,
         email: validatedData.email,
-        age: validatedData.age.toString(),
+        emailVerified: false,
       })
       .returning();
 
@@ -87,7 +82,6 @@ export async function registerUser(
         id: insertedUser.id,
         name: insertedUser.name,
         email: insertedUser.email,
-        age: insertedUser.age,
         registeredAt: insertedUser.createdAt?.toISOString(),
       },
       timestamp: Date.now(),
@@ -120,7 +114,7 @@ export async function sendMessage(
 
     if (!result.success) {
       const errors: Record<string, string> = {};
-      result.error.errors.forEach((error) => {
+      result.error.issues.forEach((error) => {
         if (error.path.length > 0) {
           errors[error.path[0] as string] = error.message;
         }
@@ -170,7 +164,7 @@ export async function sendMessage(
 // リダイレクト付きのServer Action
 export async function createPost(formData: FormData) {
   let redirectUrl: string;
-  
+
   try {
     // フォームデータをオブジェクトに変換
     const rawData = {
@@ -207,7 +201,7 @@ export async function createPost(formData: FormData) {
     // エラー時のURL設定
     redirectUrl = "/react19-test?error=post-creation-failed";
   }
-  
+
   // try-catchの外でリダイレクト実行
   redirect(redirectUrl);
 }

@@ -3,7 +3,7 @@ import SlotExplanationContainer from "./_containers/slot-explanation";
 import TechnicalDetailsContainer from "./_containers/technical-details";
 import TestNavigationContainer from "./_containers/test-navigation";
 
-export default function DashboardPage() {
+export default function ParallelTestPage() {
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}

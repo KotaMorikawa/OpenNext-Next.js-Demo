@@ -7,19 +7,19 @@ export async function TestNavigationContainer() {
     sectionTitle: "並行ルートテスト",
     testLinks: [
       {
-        href: "/dashboard/analytics",
+        href: "/parallel-test/analytics",
         icon: "📊",
         title: "アナリティクス",
         description: "サイドバーとメインコンテンツが連動",
       },
       {
-        href: "/dashboard/settings",
+        href: "/parallel-test/settings",
         icon: "⚙️",
         title: "設定",
         description: "設定ページの並行ルート",
       },
       {
-        href: "/dashboard/modal-test",
+        href: "/parallel-test/modal-test",
         icon: "🔲",
         title: "モーダル",
         description: "@modal スロットのテスト",

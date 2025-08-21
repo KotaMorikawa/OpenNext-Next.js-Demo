@@ -77,13 +77,13 @@ export const createSamplePosts = cache(async () => {
         id: "550e8400-e29b-41d4-a716-446655440001",
         name: "山田太郎",
         email: "yamada@example.com",
-        age: "30",
+        emailVerified: true,
       },
       {
         id: "550e8400-e29b-41d4-a716-446655440002",
         name: "田中花子",
         email: "tanaka@example.com",
-        age: "25",
+        emailVerified: true,
       },
     ])
     .onConflictDoNothing()

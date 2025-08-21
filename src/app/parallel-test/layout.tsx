@@ -1,4 +1,4 @@
-export default function DashboardLayout({
+export default function ParallelTestLayout({
   children,
   modal,
   sidebar,
@@ -14,7 +14,7 @@ export default function DashboardLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <h1 className="text-xl font-semibold text-gray-900">
-              ダッシュボード（並行ルートテスト）
+              並行ルートテスト
             </h1>
             <nav className="flex space-x-4">
               <a href="/" className="text-blue-600 hover:underline">

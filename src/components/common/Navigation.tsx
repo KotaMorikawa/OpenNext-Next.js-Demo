@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import AuthButton from "../auth/AuthButton";
 
 const navigationItems = [
   { href: "/", label: "ホーム" },
   { href: "/posts", label: "投稿一覧" },
   { href: "/react19-test", label: "React 19テスト" },
   { href: "/components-test", label: "Components テスト" },
-  { href: "/dashboard", label: "ダッシュボード" },
+  { href: "/parallel-test", label: "並行ルートテスト" },
   { href: "/error-test", label: "エラーテスト" },
 ];
 
@@ -30,8 +31,8 @@ export function Navigation() {
           </div>
 
           {/* デスクトップナビゲーション */}
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-4">
+          <div className="hidden md:flex md:items-center md:space-x-8">
+            <div className="flex items-baseline space-x-4">
               {navigationItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -49,6 +50,7 @@ export function Navigation() {
                 );
               })}
             </div>
+            <AuthButton />
           </div>
 
           {/* モバイルメニューボタン */}
