@@ -169,6 +169,8 @@ export async function sendMessage(
 
 // リダイレクト付きのServer Action
 export async function createPost(formData: FormData) {
+  let redirectUrl: string;
+  
   try {
     // フォームデータをオブジェクトに変換
     const rawData = {
@@ -180,31 +182,34 @@ export async function createPost(formData: FormData) {
     const result = PostSchema.safeParse(rawData);
 
     if (!result.success) {
-      // バリデーションエラーの場合はエラーページにリダイレクト
-      redirect("/react19-test?error=validation-failed");
+      // バリデーションエラーの場合のURL設定
+      redirectUrl = "/react19-test?error=validation-failed";
+    } else {
+      // データベースに投稿を保存
+      const validatedData = result.data;
+      const [insertedPost] = await db
+        .insert(posts)
+        .values({
+          title: validatedData.title,
+          content: validatedData.content,
+          excerpt: `${validatedData.content.substring(0, 150)}...`,
+          published: true,
+          // authorId は実際のアプリでは認証から取得するが、ここでは最初のユーザーを使用
+          authorId: "550e8400-e29b-41d4-a716-446655440001",
+        })
+        .returning();
+
+      // 成功時のURL設定
+      redirectUrl = `/posts/${insertedPost.id}?created=true`;
     }
-
-    // データベースに投稿を保存
-    const validatedData = result.data;
-    const [insertedPost] = await db
-      .insert(posts)
-      .values({
-        title: validatedData.title,
-        content: validatedData.content,
-        excerpt: `${validatedData.content.substring(0, 150)}...`,
-        published: true,
-        // authorId は実際のアプリでは認証から取得するが、ここでは最初のユーザーを使用
-        authorId: "550e8400-e29b-41d4-a716-446655440001",
-      })
-      .returning();
-
-    // 投稿作成後、詳細ページにリダイレクト
-    redirect(`/posts/${insertedPost.id}?created=true`);
   } catch (error) {
     console.error("Post creation error:", error);
-    // エラー時は元のページにリダイレクト
-    redirect("/react19-test?error=post-creation-failed");
+    // エラー時のURL設定
+    redirectUrl = "/react19-test?error=post-creation-failed";
   }
+  
+  // try-catchの外でリダイレクト実行
+  redirect(redirectUrl);
 }
 
 // データ削除のServer Action（form action用 - void返却）
