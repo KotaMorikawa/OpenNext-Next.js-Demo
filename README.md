@@ -69,6 +69,41 @@ test/                   # テスト設定
 TASK.md                # 機能検証タスクリスト
 ```
 
+## 開発指針とディレクトリ構成原則
+
+### ファイル配置の基本ルール
+
+#### プライベートフォルダ規約（`_`プレフィックス）
+- `_components/` - そのルートでのみ使用するローカルコンポーネント
+- `_containers/` - Container/Presentationalパターンの実装
+- `_lib/` - ルート固有のユーティリティやヘルパー
+  - `fetchers/` - データ取得ロジック
+  - `actions/` - Server Actions・フォームアクション
+  - `validators/` - バリデーションルール
+  - `utils/` - ヘルパー関数
+  - `types/` - ルート固有の型定義
+
+#### Container/Presentationalパターン
+```
+_containers/feature-name/
+├── index.tsx           # エクスポート専用
+├── container.tsx       # ビジネスロジック・状態管理
+└── presentational.tsx  # UI表現・プロップス受け取り
+```
+
+#### 配置判断フロー
+1. **既存ルートで使用** → そのルートの`_components/`
+2. **複数ルートで使用** → `src/components/`
+3. **ビジネスロジック含む** → `_containers/`でContainer/Presentational分離
+4. **データ取得・ユーティリティ** → ルート固有なら`_lib/`、汎用なら`src/lib/`
+
+### App Router高度機能の活用
+- **並列ルート**: `@sidebar/`, `@modal/` など
+- **動的ルート**: `[id]/` と機能固有フォルダの組み合わせ
+- **コロケーション**: 関連するすべてのファイルを近くに配置
+
+詳細な設計原則は `CLAUDE.md` を参照してください。
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
