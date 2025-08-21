@@ -2,7 +2,7 @@ import DataLoader from "dataloader";
 import { eq, inArray } from "drizzle-orm";
 import * as React from "react";
 import { db } from "@/lib/db";
-import { likes, users } from "@/lib/db/schema";
+import { likes, user } from "@/lib/db/schema";
 
 // 投稿IDからいいね数を取得
 async function batchGetLikeCountsByPostIds(postIds: readonly string[]) {
@@ -30,27 +30,27 @@ async function batchGetLikedUsersByPostIds(postIds: readonly string[]) {
   const likedUsers = await db
     .select({
       postId: likes.postId,
-      user: users,
+      user: user,
       likedAt: likes.createdAt,
     })
     .from(likes)
-    .innerJoin(users, eq(likes.userId, users.id))
+    .innerJoin(user, eq(likes.userId, user.id))
     .where(inArray(likes.postId, [...postIds]))
     .orderBy(likes.createdAt);
 
   // 投稿IDごとにユーザーをグループ化
-  const usersByPostId = new Map<string, typeof likedUsers>();
+  const userByPostId = new Map<string, typeof likedUsers>();
 
   for (const item of likedUsers) {
     const postId = item.postId;
-    if (!usersByPostId.has(postId)) {
-      usersByPostId.set(postId, []);
+    if (!userByPostId.has(postId)) {
+      userByPostId.set(postId, []);
     }
-    usersByPostId.get(postId)?.push(item);
+    userByPostId.get(postId)?.push(item);
   }
 
   // IDの順序を保持しながら結果をマップ
-  return postIds.map((postId) => usersByPostId.get(postId) || []);
+  return postIds.map((postId) => userByPostId.get(postId) || []);
 }
 
 // ユーザーIDからいいねした投稿数を取得

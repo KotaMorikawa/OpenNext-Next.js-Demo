@@ -10,49 +10,64 @@ import {
 } from "drizzle-orm/pg-core";
 
 // Better Auth compatible schema
-export const users = pgTable("users", {
+export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: boolean("emailVerified").default(false).notNull(),
+  emailVerified: boolean("email_verified")
+    .$defaultFn(() => false)
+    .notNull(),
   image: text("image"),
-  createdAt: timestamp("createdAt", { withTimezone: true })
-    .defaultNow()
+  createdAt: timestamp("created_at")
+    .$defaultFn(() => /* @__PURE__ */ new Date())
     .notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true })
-    .defaultNow()
+  updatedAt: timestamp("updated_at")
+    .$defaultFn(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
 
-export const sessions = pgTable("sessions", {
+export const session = pgTable("session", {
   id: text("id").primaryKey(),
-  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-  ipAddress: text("ipAddress"),
-  userAgent: text("userAgent"),
-  userId: text("userId")
+  expiresAt: timestamp("expires_at").notNull(),
+  token: text("token").notNull().unique(),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => user.id, { onDelete: "cascade" }),
 });
 
-export const accounts = pgTable("accounts", {
+export const account = pgTable("account", {
   id: text("id").primaryKey(),
-  accountId: text("accountId").notNull(),
-  providerId: text("providerId").notNull(),
-  userId: text("userId")
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  userId: text("user_id")
     .notNull()
-    .references(() => users.id),
-  accessToken: text("accessToken"),
-  refreshToken: text("refreshToken"),
-  idToken: text("idToken"),
-  expiresAt: timestamp("expiresAt", { withTimezone: true }),
+    .references(() => user.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  scope: text("scope"),
   password: text("password"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
 });
 
-export const verifications = pgTable("verifications", {
+export const verification = pgTable("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").$defaultFn(
+    () => /* @__PURE__ */ new Date(),
+  ),
+  updatedAt: timestamp("updated_at").$defaultFn(
+    () => /* @__PURE__ */ new Date(),
+  ),
 });
 
 // Existing application tables
@@ -62,24 +77,22 @@ export const posts = pgTable("posts", {
   content: text("content").notNull(),
   excerpt: varchar("excerpt", { length: 500 }),
   published: boolean("published").default(false).notNull(),
-  authorId: text("author_id").references(() => users.id),
+  authorId: text("author_id").references(() => user.id),
   categoryId: uuid("category_id").references(() => categories.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const messages = pgTable("messages", {
+// React 19検証用タスクテーブル
+export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
-  category: varchar("category", { length: 50 }).notNull(),
-  message: text("message").notNull(),
-  userId: text("user_id").references(() => users.id),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
-
-export const items = pgTable("items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 255 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, in_progress, completed
+  priority: varchar("priority", { length: 10 }).notNull().default("medium"), // low, medium, high
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -104,7 +117,7 @@ export const comments = pgTable("comments", {
     .references(() => posts.id, { onDelete: "cascade" }),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => user.id),
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -144,7 +157,7 @@ export const likes = pgTable("likes", {
     .references(() => posts.id, { onDelete: "cascade" }),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => user.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
@@ -152,7 +165,7 @@ export const likes = pgTable("likes", {
 export const userProfiles = pgTable("user_profiles", {
   userId: text("user_id")
     .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => user.id, { onDelete: "cascade" }),
   bio: text("bio"),
   location: varchar("location", { length: 100 }),
   website: varchar("website", { length: 255 }),
@@ -164,37 +177,37 @@ export const userProfiles = pgTable("user_profiles", {
 });
 
 // Relations
-export const usersRelations = relations(users, ({ one, many }) => ({
+export const userRelations = relations(user, ({ one, many }) => ({
   posts: many(posts),
-  sessions: many(sessions),
-  accounts: many(accounts),
-  messages: many(messages),
+  sessions: many(session),
+  accounts: many(account),
+  tasks: many(tasks),
   comments: many(comments),
   likes: many(likes),
   profile: one(userProfiles, {
-    fields: [users.id],
+    fields: [user.id],
     references: [userProfiles.userId],
   }),
 }));
 
-export const sessionsRelations = relations(sessions, ({ one }) => ({
-  user: one(users, {
-    fields: [sessions.userId],
-    references: [users.id],
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
   }),
 }));
 
-export const accountsRelations = relations(accounts, ({ one }) => ({
-  user: one(users, {
-    fields: [accounts.userId],
-    references: [users.id],
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
   }),
 }));
 
 export const postsRelations = relations(posts, ({ one, many }) => ({
-  author: one(users, {
+  author: one(user, {
     fields: [posts.authorId],
-    references: [users.id],
+    references: [user.id],
   }),
   category: one(categories, {
     fields: [posts.categoryId],
@@ -205,10 +218,10 @@ export const postsRelations = relations(posts, ({ one, many }) => ({
   postTags: many(postTags),
 }));
 
-export const messagesRelations = relations(messages, ({ one }) => ({
-  user: one(users, {
-    fields: [messages.userId],
-    references: [users.id],
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  user: one(user, {
+    fields: [tasks.userId],
+    references: [user.id],
   }),
 }));
 
@@ -223,9 +236,9 @@ export const commentsRelations = relations(comments, ({ one }) => ({
     fields: [comments.postId],
     references: [posts.id],
   }),
-  author: one(users, {
+  author: one(user, {
     fields: [comments.userId],
-    references: [users.id],
+    references: [user.id],
   }),
 }));
 
@@ -249,15 +262,15 @@ export const likesRelations = relations(likes, ({ one }) => ({
     fields: [likes.postId],
     references: [posts.id],
   }),
-  user: one(users, {
+  user: one(user, {
     fields: [likes.userId],
-    references: [users.id],
+    references: [user.id],
   }),
 }));
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userProfiles.userId],
-    references: [users.id],
+    references: [user.id],
   }),
 }));

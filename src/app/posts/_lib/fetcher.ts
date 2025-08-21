@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { cache } from "react";
 import { db } from "@/lib/db";
-import { posts, users } from "@/lib/db/schema";
+import { posts, user } from "@/lib/db/schema";
 
 // Request Memoizationを活用した投稿データ取得関数
 export const getAllPosts = cache(async () => {
@@ -14,11 +14,11 @@ export const getAllPosts = cache(async () => {
       published: posts.published,
       createdAt: posts.createdAt,
       updatedAt: posts.updatedAt,
-      authorName: users.name,
-      authorEmail: users.email,
+      authorName: user.name,
+      authorEmail: user.email,
     })
     .from(posts)
-    .leftJoin(users, eq(posts.authorId, users.id))
+    .leftJoin(user, eq(posts.authorId, user.id))
     .where(eq(posts.published, true))
     .orderBy(desc(posts.createdAt));
 
@@ -35,11 +35,11 @@ export const getPostById = cache(async (id: string) => {
       published: posts.published,
       createdAt: posts.createdAt,
       updatedAt: posts.updatedAt,
-      authorName: users.name,
-      authorEmail: users.email,
+      authorName: user.name,
+      authorEmail: user.email,
     })
     .from(posts)
-    .leftJoin(users, eq(posts.authorId, users.id))
+    .leftJoin(user, eq(posts.authorId, user.id))
     .where(eq(posts.id, id))
     .limit(1);
 
@@ -56,11 +56,11 @@ export const getPostsByAuthor = cache(async (authorId: string) => {
       published: posts.published,
       createdAt: posts.createdAt,
       updatedAt: posts.updatedAt,
-      authorName: users.name,
-      authorEmail: users.email,
+      authorName: user.name,
+      authorEmail: user.email,
     })
     .from(posts)
-    .leftJoin(users, eq(posts.authorId, users.id))
+    .leftJoin(user, eq(posts.authorId, user.id))
     .where(eq(posts.authorId, authorId))
     .orderBy(desc(posts.createdAt));
 
@@ -71,7 +71,7 @@ export const getPostsByAuthor = cache(async (authorId: string) => {
 export const createSamplePosts = cache(async () => {
   // まずユーザーを作成
   const sampleUsers = await db
-    .insert(users)
+    .insert(user)
     .values([
       {
         id: "550e8400-e29b-41d4-a716-446655440001",
@@ -155,5 +155,5 @@ TypeScript 5.4では、型推論の改善やパフォーマンスの向上が行
     .onConflictDoNothing()
     .returning();
 
-  return { users: sampleUsers, posts: samplePosts };
+  return { user: sampleUsers, posts: samplePosts };
 });

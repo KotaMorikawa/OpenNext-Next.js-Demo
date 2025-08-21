@@ -1,7 +1,7 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { comments, likes, posts, users } from "@/lib/db/schema";
+import { comments, likes, posts, user } from "@/lib/db/schema";
 import { getCommentCountsByPostIds } from "@/lib/loaders/comments";
 import { getLikeCountsByPostIds } from "@/lib/loaders/likes";
 import { getUsersByIds } from "@/lib/loaders/users";
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         results: result,
         performance: {
           executionTime: `${(end - start).toFixed(2)}ms`,
-          queryCount: 3, // 投稿 + バッチ集約クエリ (likes, comments, users)
+          queryCount: 3, // 投稿 + バッチ集約クエリ (likes, comments, user)
           efficiency: "高効率",
         },
         benefits: [
@@ -105,9 +105,9 @@ export async function GET(request: NextRequest) {
 
         const authorResult = post.authorId
           ? await db
-              .select({ name: users.name })
-              .from(users)
-              .where(eq(users.id, post.authorId))
+              .select({ name: user.name })
+              .from(user)
+              .where(eq(user.id, post.authorId))
               .limit(1)
               .then((rows) => rows[0])
           : null;
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
           .where(inArray(comments.postId, postIds))
           .groupBy(comments.postId),
 
-        db.select().from(users).where(inArray(users.id, authorIds)),
+        db.select().from(user).where(inArray(user.id, authorIds)),
       ]);
 
       const end = performance.now();
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
         results: result,
         performance: {
           executionTime: `${(end - start).toFixed(2)}ms`,
-          queryCount: 4, // 投稿 + likes + comments + users
+          queryCount: 4, // 投稿 + likes + comments + user
           efficiency: "中効率",
         },
         characteristics: [
