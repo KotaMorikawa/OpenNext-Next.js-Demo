@@ -1,18 +1,18 @@
 "use client";
 
 import { useOptimistic } from "react";
-import FeatureExplanation from "../../_components/FeatureExplanation";
-import PriorityBadge from "../../_components/PriorityBadge";
-import StatusBadge from "../../_components/StatusBadge";
-import TaskMetaInfo from "../../_components/TaskMetaInfo";
-import TaskStatusButtons from "../../_components/TaskStatusButtons";
-import type { Task } from "../../_lib/types";
+import type { Task } from "../_lib/types";
+import FeatureExplanation from "./FeatureExplanation";
+import PriorityBadge from "./PriorityBadge";
+import StatusBadge from "./StatusBadge";
+import TaskMetaInfo from "./TaskMetaInfo";
+import TaskStatusButtons from "./TaskStatusButtons";
 
 type Props = {
   task: Task;
 };
 
-export default function TaskItemPresentational({ task }: Props) {
+export default function TaskItem({ task }: Props) {
   const [optimisticStatus, setOptimisticStatus] = useOptimistic(
     task.status,
     (_currentStatus, newStatus: typeof task.status) => newStatus,

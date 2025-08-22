@@ -1,7 +1,7 @@
 import FeatureExplanation from "../../_components/FeatureExplanation";
 import TaskDeleteButton from "../../_components/TaskDeleteButton";
+import TaskItem from "../../_components/TaskItem";
 import type { Task } from "../../_lib/types";
-import TaskItemContainer from "../task-item";
 
 type Props = {
   tasks: Task[];
@@ -53,7 +53,7 @@ export default function TaskListPresentational({ tasks }: Props) {
           key={task.id}
           className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
         >
-          <TaskItemContainer task={task} />
+          <TaskItem task={task} />
 
           {/* 削除ボタン（form action使用） */}
           <div className="mt-4 pt-4 border-t border-gray-100">
