@@ -39,10 +39,10 @@ export function Footer() {
             <ul className="text-gray-600 text-sm space-y-2">
               <li>
                 <Link
-                  href="/posts"
+                  href="/blog-management"
                   className="hover:text-blue-600 transition-colors"
                 >
-                  投稿一覧（Container/Presentational）
+                  ブログ管理（Container/Presentational）
                 </Link>
               </li>
               <li>

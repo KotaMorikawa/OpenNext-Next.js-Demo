@@ -1,5 +1,5 @@
-import PostDetailContainer from "../_containers/post-detail";
 import { getAllPosts } from "../_lib/fetcher";
+import PostDetailContainer from "./_containers/post-detail";
 
 // 投稿詳細ページ：Container 1stな設計でContainer Componentのみを使用
 export default async function PostPage({

@@ -15,9 +15,9 @@ export async function GettingStartedContainer() {
         primary: true,
       },
       {
-        title: "投稿管理",
+        title: "ブログ管理",
         description: "動的ルーティングとデータフェッチのデモ",
-        href: "/posts",
+        href: "/blog-management",
       },
       {
         title: "コンポーネント境界",

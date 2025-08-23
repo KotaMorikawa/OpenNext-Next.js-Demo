@@ -5,8 +5,8 @@ export async function PageNavigationContainer() {
   // ナビゲーションリンクのデータを定義
   const navigationLinks = [
     {
-      href: "/posts",
-      label: "動的ルーティングテスト",
+      href: "/blog-management",
+      label: "ブログ管理",
       className:
         "bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors",
     },

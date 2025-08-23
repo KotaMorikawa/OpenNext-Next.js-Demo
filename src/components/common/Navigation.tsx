@@ -6,7 +6,7 @@ import AuthButton from "../auth/AuthButton";
 
 const navigationItems = [
   { href: "/", label: "ホーム" },
-  { href: "/posts", label: "投稿一覧" },
+  { href: "/blog-management", label: "ブログ管理" },
   { href: "/react19-test", label: "React 19テスト" },
   { href: "/components-test", label: "Components テスト" },
   { href: "/parallel-test", label: "並行ルートテスト" },
