@@ -4,13 +4,13 @@ export type { ButtonSize, ButtonVariant } from "./Button";
 export { Button } from "./Button";
 export { Card, CardContent, CardFooter, CardHeader } from "./Card";
 export { Modal } from "./Modal";
+export {
+  CompactPostSkeleton,
+  MetadataSkeleton,
+  PostsListSkeleton,
+  TagsSkeleton,
+  TitlesSkeleton,
+} from "./Skeleton";
 export type { TagSize } from "./Tag";
 export { Tag } from "./Tag";
 export { Timeline } from "./Timeline";
-export {
-  PostsListSkeleton,
-  MetadataSkeleton,
-  TagsSkeleton,
-  TitlesSkeleton,
-  CompactPostSkeleton,
-} from "./Skeleton";

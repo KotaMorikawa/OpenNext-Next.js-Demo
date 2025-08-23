@@ -1,6 +1,6 @@
 import { getCurrentUserId } from "@/lib/auth-server";
+import type { PostWithMetadata } from "@/lib/types/api";
 import { getBulkPostMetadata } from "../../_lib/fetcher";
-import { getPostsPaginated } from "@/app/api/_lib/db/queries/posts";
 import { PostsListPresentation } from "./presentational";
 
 type PostsListContainerProps = {
@@ -17,17 +17,25 @@ export async function PostsListContainer({
 }: PostsListContainerProps = {}) {
   const currentUserId = await getCurrentUserId();
 
-  // ページネーション対応の投稿取得
-  const paginationResult = await getPostsPaginated(page, limit, view);
+  // API Route経由でページネーション対応の投稿取得
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/posts?type=paginated&page=${page}&limit=${limit}&view=${view}`,
+  );
+
+  if (!response.ok) {
+    throw new Error("投稿の取得に失敗しました");
+  }
+
+  const paginationResult = await response.json();
   const { posts, totalPages, currentPage, hasNext, hasPrevious } =
     paginationResult;
 
   // 表示分のpostIdのみでメタデータを取得（最大20件なのでHTTP 431エラー回避）
-  const postIds = posts.map((post) => post.id);
+  const postIds = posts.map((post: PostWithMetadata) => post.id);
   const postsMetadata = await getBulkPostMetadata(postIds);
 
   // 投稿データにメタデータを結合
-  const postsWithMetadata = posts.map((post) => ({
+  const postsWithMetadata = posts.map((post: PostWithMetadata) => ({
     ...post,
     likeCount: postsMetadata[post.id]?.likeCount || 0,
     commentCount: postsMetadata[post.id]?.commentCount || 0,

@@ -1,13 +1,10 @@
 "use server";
 
-import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth-server";
-import { db } from "@/lib/db";
-import { tasks } from "@/lib/db/schema";
-import type { TaskFormState, TaskPriority, TaskStatus } from "../types";
+import type { Task, TaskFormState, TaskPriority, TaskStatus } from "../types";
 
 // バリデーションスキーマ
 const TaskSchema = z.object({
@@ -29,7 +26,7 @@ export async function createTask(
 ): Promise<TaskFormState> {
   try {
     // 認証チェック
-    const session = await requireAuth();
+    const _session = await requireAuth();
 
     // フォームデータを抽出
     const rawData = {
@@ -57,17 +54,29 @@ export async function createTask(
       };
     }
 
-    // データベースに保存
+    // API Route経由でタスクを作成
     const validatedData = result.data;
-    const [insertedTask] = await db
-      .insert(tasks)
-      .values({
-        title: validatedData.title,
-        description: validatedData.description || null,
-        priority: validatedData.priority || "medium",
-        userId: session.user.id,
-      })
-      .returning();
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tasks`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(validatedData),
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return {
+        success: false,
+        message: errorData.error || "タスクの作成に失敗しました",
+        timestamp: Date.now(),
+      };
+    }
+
+    const insertedTask = await response.json();
 
     // ページを再検証
     revalidatePath("/react19-test");
@@ -79,8 +88,7 @@ export async function createTask(
         id: insertedTask.id,
         title: insertedTask.title,
         priority: insertedTask.priority as TaskPriority,
-        createdAt:
-          insertedTask.createdAt?.toISOString() || new Date().toISOString(),
+        createdAt: insertedTask.createdAt || new Date().toISOString(),
       },
       timestamp: Date.now(),
     };
@@ -102,29 +110,33 @@ export async function createTask(
  */
 export async function deleteTask(formData: FormData): Promise<void> {
   try {
-    const session = await requireAuth();
+    const _session = await requireAuth();
     const taskId = formData.get("taskId") as string;
 
     if (!taskId) {
       throw new Error("タスクIDが必要です");
     }
 
-    // 所有権チェック - タスクの所有者かどうか確認
-    const [task] = await db
-      .select({ userId: tasks.userId })
-      .from(tasks)
-      .where(eq(tasks.id, taskId));
+    // API Route経由でタスクを削除
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tasks?id=${taskId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-    if (!task) {
-      throw new Error("タスクが見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("タスクが見つかりません");
+      } else if (response.status === 403) {
+        throw new Error("このタスクを削除する権限がありません");
+      }
+      throw new Error(errorData.error || "タスクの削除に失敗しました");
     }
-
-    if (task.userId !== session.user.id) {
-      throw new Error("このタスクを削除する権限がありません");
-    }
-
-    // タスクを削除
-    await db.delete(tasks).where(eq(tasks.id, taskId));
 
     console.log(`Deleted task: ${taskId}`);
   } catch (error) {
@@ -145,33 +157,38 @@ export async function updateTaskStatus(
   status: "pending" | "in_progress" | "completed",
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const session = await requireAuth();
+    const _session = await requireAuth();
 
-    // 所有権チェック
-    const [task] = await db
-      .select({ userId: tasks.userId })
-      .from(tasks)
-      .where(eq(tasks.id, taskId));
+    // API Route経由でタスクステータスを更新
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tasks`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: taskId,
+          status: status,
+        }),
+      },
+    );
 
-    if (!task) {
-      return { success: false, message: "タスクが見つかりません" };
-    }
-
-    if (task.userId !== session.user.id) {
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        return { success: false, message: "タスクが見つかりません" };
+      } else if (response.status === 403) {
+        return {
+          success: false,
+          message: "このタスクを更新する権限がありません",
+        };
+      }
       return {
         success: false,
-        message: "このタスクを更新する権限がありません",
+        message: errorData.error || "ステータスの更新に失敗しました",
       };
     }
-
-    // ステータスを更新
-    await db
-      .update(tasks)
-      .set({
-        status,
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId));
 
     revalidatePath("/react19-test");
 
@@ -190,26 +207,23 @@ export async function updateTaskStatus(
  */
 export async function getUserTasks() {
   try {
-    const session = await requireAuth();
+    const _session = await requireAuth();
 
-    const userTasks = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        description: tasks.description,
-        status: tasks.status,
-        priority: tasks.priority,
-        createdAt: tasks.createdAt,
-        updatedAt: tasks.updatedAt,
-      })
-      .from(tasks)
-      .where(eq(tasks.userId, session.user.id))
-      .orderBy(desc(tasks.createdAt));
+    // API Route経由でユーザーのタスク一覧を取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tasks`,
+    );
 
-    return userTasks.map((task) => ({
+    if (!response.ok) {
+      throw new Error("タスクの取得に失敗しました");
+    }
+
+    const userTasks = await response.json();
+
+    return userTasks.map((task: Task) => ({
       ...task,
-      status: task.status as TaskStatus,
-      priority: task.priority as TaskPriority,
+      status: (task as { status: TaskStatus }).status,
+      priority: (task as { priority: TaskPriority }).priority,
     }));
   } catch (error) {
     console.error("Failed to fetch user tasks:", error);
@@ -225,7 +239,7 @@ export async function updateTask(
   formData: FormData,
 ): Promise<TaskFormState> {
   try {
-    const session = await requireAuth();
+    const _session = await requireAuth();
     const taskId = formData.get("taskId") as string;
 
     if (!taskId) {
@@ -261,40 +275,45 @@ export async function updateTask(
       };
     }
 
-    // 所有権チェック
-    const [existingTask] = await db
-      .select({ userId: tasks.userId })
-      .from(tasks)
-      .where(eq(tasks.id, taskId));
-
-    if (!existingTask) {
-      return {
-        success: false,
-        message: "タスクが見つかりません",
-        timestamp: Date.now(),
-      };
-    }
-
-    if (existingTask.userId !== session.user.id) {
-      return {
-        success: false,
-        message: "このタスクを更新する権限がありません",
-        timestamp: Date.now(),
-      };
-    }
-
-    // タスクを更新
+    // API Route経由でタスクを更新
     const validatedData = result.data;
-    const [updatedTask] = await db
-      .update(tasks)
-      .set({
-        title: validatedData.title,
-        description: validatedData.description || null,
-        priority: validatedData.priority || "medium",
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId))
-      .returning();
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tasks`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: taskId,
+          ...validatedData,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        return {
+          success: false,
+          message: "タスクが見つかりません",
+          timestamp: Date.now(),
+        };
+      } else if (response.status === 403) {
+        return {
+          success: false,
+          message: "このタスクを更新する権限がありません",
+          timestamp: Date.now(),
+        };
+      }
+      return {
+        success: false,
+        message: errorData.error || "タスクの更新に失敗しました",
+        timestamp: Date.now(),
+      };
+    }
+
+    const updatedTask = await response.json();
 
     revalidatePath("/react19-test");
 
@@ -305,9 +324,8 @@ export async function updateTask(
         id: updatedTask.id,
         title: updatedTask.title,
         priority: updatedTask.priority as TaskPriority,
-        createdAt:
-          updatedTask.createdAt?.toISOString() || new Date().toISOString(),
-        updatedAt: updatedTask.updatedAt?.toISOString(),
+        createdAt: updatedTask.createdAt || new Date().toISOString(),
+        updatedAt: updatedTask.updatedAt,
       },
       timestamp: Date.now(),
     };

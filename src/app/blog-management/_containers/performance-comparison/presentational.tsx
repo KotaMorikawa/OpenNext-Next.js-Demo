@@ -1,9 +1,8 @@
 "use client";
 
-import { Timeline } from "../../_components/ui";
-import { Card } from "../../_components/ui";
 import { CompactPostList } from "../../_components/performance/CompactPostList";
 import { SuspensePostList } from "../../_components/performance/SuspensePostList";
+import { Card, Timeline } from "../../_components/ui";
 
 interface TimelineStep {
   label: string;

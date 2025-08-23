@@ -123,8 +123,13 @@ export type ApiResponse<T> = T | ApiError;
 
 // === 型ガード関数 ===
 
-export function isApiError(response: any): response is ApiError {
-  return response && typeof response.error === "string";
+export function isApiError(response: unknown): response is ApiError {
+  return (
+    typeof response === "object" &&
+    response !== null &&
+    "error" in response &&
+    typeof (response as { error?: unknown }).error === "string"
+  );
 }
 
 // === キャッシュパターン型 ===

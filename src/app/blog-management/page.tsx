@@ -1,5 +1,5 @@
-import PostsListContainer from "./_containers/posts-list";
 import { PerformanceComparisonContainer } from "./_containers/performance-comparison";
+import PostsListContainer from "./_containers/posts-list";
 
 type BlogManagementPageProps = {
   searchParams: Promise<{ view?: string; page?: string }>;

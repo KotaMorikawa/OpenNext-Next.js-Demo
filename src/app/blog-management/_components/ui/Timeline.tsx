@@ -85,7 +85,10 @@ export function Timeline({
 
         {/* 各ステップ */}
         {steps.map((step, index) => (
-          <div key={index} className="flex items-start mb-6 relative">
+          <div
+            key={`timeline-step-${step.label}-${index}`}
+            className="flex items-start mb-6 relative"
+          >
             {/* ノード */}
             <div
               className={`

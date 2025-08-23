@@ -1,10 +1,27 @@
 // Skeleton コンポーネント群（Streaming SSR用）
 
+// 固定のIDを使用してスケルトンを生成
+const POST_SKELETON_IDS = ["post-1", "post-2", "post-3"];
+const TITLE_SKELETON_IDS = [
+  "title-1",
+  "title-2",
+  "title-3",
+  "title-4",
+  "title-5",
+];
+const COMPACT_POST_SKELETON_IDS = [
+  "compact-1",
+  "compact-2",
+  "compact-3",
+  "compact-4",
+  "compact-5",
+];
+
 export function PostsListSkeleton() {
   return (
     <div className="space-y-6">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="border rounded-lg p-6 bg-white">
+      {POST_SKELETON_IDS.map((id) => (
+        <div key={id} className="border rounded-lg p-6 bg-white">
           {/* タイトルSkeleton */}
           <div className="h-6 bg-gray-200 rounded w-3/4 mb-4 animate-pulse" />
 
@@ -55,8 +72,8 @@ export function TagsSkeleton() {
 export function TitlesSkeleton() {
   return (
     <div className="space-y-4">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="h-6 bg-gray-200 rounded w-3/4 animate-pulse" />
+      {TITLE_SKELETON_IDS.map((id) => (
+        <div key={id} className="h-6 bg-gray-200 rounded w-3/4 animate-pulse" />
       ))}
     </div>
   );
@@ -65,9 +82,9 @@ export function TitlesSkeleton() {
 export function CompactPostSkeleton() {
   return (
     <div className="space-y-3">
-      {[...Array(5)].map((_, i) => (
+      {COMPACT_POST_SKELETON_IDS.map((id) => (
         <div
-          key={i}
+          key={id}
           className="flex items-center justify-between p-3 border rounded bg-white"
         >
           <div className="h-4 bg-gray-200 rounded w-48 animate-pulse" />

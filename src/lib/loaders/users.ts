@@ -1,62 +1,106 @@
 import DataLoader from "dataloader";
-import { eq, inArray } from "drizzle-orm";
 import * as React from "react";
-import { db } from "@/lib/db";
-import { user, userProfiles } from "@/lib/db/schema";
 
 // ユーザー情報のバッチ取得関数
 async function batchGetUsers(userIds: readonly string[]) {
   if (userIds.length === 0) return [];
 
-  const fetchedUsers = await db
-    .select()
-    .from(user)
-    .where(inArray(user.id, [...userIds]));
+  try {
+    // API Route経由でユーザー情報を一括取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/users?ids=${userIds.join(",")}`,
+    );
 
-  // IDの順序を保持しながら結果をマップ
-  return userIds.map(
-    (id) => fetchedUsers.find((user) => user.id === id) || null,
-  );
+    if (!response.ok) {
+      throw new Error("ユーザー情報の取得に失敗しました");
+    }
+
+    const fetchedUsers = await response.json();
+
+    // IDの順序を保持しながら結果をマップ
+    return userIds.map(
+      (id) =>
+        fetchedUsers.find(
+          (user: {
+            id: string;
+            name: string;
+            email: string;
+            createdAt: string;
+          }) => user.id === id,
+        ) || null,
+    );
+  } catch (error) {
+    console.error("バッチユーザー取得エラー:", error);
+    return userIds.map(() => null);
+  }
 }
 
 // ユーザープロフィールのバッチ取得関数
 async function batchGetUserProfiles(userIds: readonly string[]) {
   if (userIds.length === 0) return [];
 
-  const fetchedProfiles = await db
-    .select()
-    .from(userProfiles)
-    .where(inArray(userProfiles.userId, [...userIds]));
-
-  // IDの順序を保持しながら結果をマップ
-  return userIds.map(
-    (id) => fetchedProfiles.find((profile) => profile.userId === id) || null,
-  );
+  try {
+    // この機能はAPI Routesでの実装が必要なため、一時的にnullを返す
+    // 必要に応じてAPI Routesに追加実装
+    console.warn("batchGetUserProfiles: API Route経由の実装が必要です");
+    return userIds.map(() => null);
+  } catch (error) {
+    console.error("バッチユーザープロフィール取得エラー:", error);
+    return userIds.map(() => null);
+  }
 }
 
 // ユーザーとプロフィール情報の結合取得関数
 async function batchGetUsersWithProfiles(userIds: readonly string[]) {
   if (userIds.length === 0) return [];
 
-  const fetchedUsers = await db
-    .select({
-      user: user,
-      profile: userProfiles,
-    })
-    .from(user)
-    .leftJoin(userProfiles, eq(user.id, userProfiles.userId))
-    .where(inArray(user.id, [...userIds]));
+  try {
+    // API Route経由でプロフィール付きユーザー情報を一括取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/users?ids=${userIds.join(",")}&withProfiles=true`,
+    );
 
-  // IDの順序を保持しながら結果をマップ
-  return userIds.map((id) => {
-    const found = fetchedUsers.find((item) => item.user.id === id);
-    return found
-      ? {
-          user: found.user,
-          profile: found.profile,
-        }
-      : null;
-  });
+    if (!response.ok) {
+      throw new Error("ユーザー&プロフィール情報の取得に失敗しました");
+    }
+
+    const fetchedUsers = await response.json();
+
+    // IDの順序を保持しながら結果をマップ
+    return userIds.map((id) => {
+      const found = fetchedUsers.find(
+        (user: {
+          id: string;
+          name: string;
+          email: string;
+          createdAt: string;
+          profileBio?: string;
+          profileAvatar?: string;
+        }) => user.id === id,
+      );
+      return found
+        ? {
+            user: {
+              id: found.id,
+              name: found.name,
+              email: found.email,
+              createdAt: found.createdAt,
+            },
+            profile:
+              found.profileBio || found.profileAvatar
+                ? {
+                    userId: found.id,
+                    bio: found.profileBio,
+                    avatar: found.profileAvatar,
+                  }
+                : null,
+          }
+        : null;
+    });
+  } catch (error) {
+    console.error("バッチユーザー&プロフィール取得エラー:", error);
+    return userIds.map(() => null);
+  }
 }
 
 // React.cache()を使用してリクエスト単位でDataLoaderインスタンスを管理

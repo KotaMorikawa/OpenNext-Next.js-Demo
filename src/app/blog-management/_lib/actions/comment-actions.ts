@@ -1,11 +1,8 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { getCurrentUserId, requireAuth } from "@/lib/auth-server";
-import { db } from "@/lib/db";
-import { comments, posts } from "@/lib/db/schema";
 
 // バリデーションスキーマ
 const createCommentSchema = z.object({
@@ -28,7 +25,7 @@ const updateCommentSchema = z.object({
 export async function createComment(formData: FormData) {
   try {
     const session = await requireAuth();
-    const userId = session.user.id;
+    const _userId = session.user.id;
 
     const rawData = {
       postId: formData.get("postId")?.toString() || "",
@@ -37,26 +34,27 @@ export async function createComment(formData: FormData) {
 
     const validatedData = createCommentSchema.parse(rawData);
 
-    // 投稿が存在するかチェック
-    const postExists = await db
-      .select({ id: posts.id })
-      .from(posts)
-      .where(eq(posts.id, validatedData.postId))
-      .limit(1);
+    // コメントをAPI Route経由で作成
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/comments`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(validatedData),
+      },
+    );
 
-    if (postExists.length === 0) {
-      throw new Error("投稿が見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("投稿が見つかりません");
+      }
+      throw new Error(errorData.error || "コメントの作成に失敗しました");
     }
 
-    // コメントをデータベースに作成
-    const [newComment] = await db
-      .insert(comments)
-      .values({
-        postId: validatedData.postId,
-        userId: userId,
-        content: validatedData.content,
-      })
-      .returning({ id: comments.id });
+    const newComment = await response.json();
 
     revalidatePath(`/blog-management/${validatedData.postId}`);
     revalidatePath("/blog-management");
@@ -78,7 +76,7 @@ export async function createComment(formData: FormData) {
 export async function updateComment(formData: FormData) {
   try {
     const session = await requireAuth();
-    const userId = session.user.id;
+    const _userId = session.user.id;
 
     const rawData = {
       id: formData.get("id")?.toString() || "",
@@ -87,34 +85,29 @@ export async function updateComment(formData: FormData) {
 
     const validatedData = updateCommentSchema.parse(rawData);
 
-    // 自分のコメントかチェック
-    const existingComment = await db
-      .select({
-        userId: comments.userId,
-        postId: comments.postId,
-      })
-      .from(comments)
-      .where(eq(comments.id, validatedData.id))
-      .limit(1);
+    // コメントをAPI Route経由で更新
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/comments`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(validatedData),
+      },
+    );
 
-    if (existingComment.length === 0) {
-      throw new Error("コメントが見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("コメントが見つかりません");
+      } else if (response.status === 403) {
+        throw new Error("このコメントを編集する権限がありません");
+      }
+      throw new Error(errorData.error || "コメントの更新に失敗しました");
     }
 
-    if (existingComment[0].userId !== userId) {
-      throw new Error("このコメントを編集する権限がありません");
-    }
-
-    // コメントを更新
-    await db
-      .update(comments)
-      .set({
-        content: validatedData.content,
-        updatedAt: new Date(),
-      })
-      .where(eq(comments.id, validatedData.id));
-
-    revalidatePath(`/blog-management/${existingComment[0].postId}`);
+    // リバリデーションはAPI Route側で実行されるため、ここでは最小限のリバリデーション
     revalidatePath("/blog-management");
     revalidateTag("posts-metadata");
 
@@ -134,35 +127,35 @@ export async function updateComment(formData: FormData) {
 export async function deleteComment(formData: FormData) {
   try {
     const session = await requireAuth();
-    const userId = session.user.id;
+    const _userId = session.user.id;
 
     const commentId = formData.get("id")?.toString();
     if (!commentId) {
       throw new Error("コメントIDが指定されていません");
     }
 
-    // 自分のコメントかチェック
-    const existingComment = await db
-      .select({
-        userId: comments.userId,
-        postId: comments.postId,
-      })
-      .from(comments)
-      .where(eq(comments.id, commentId))
-      .limit(1);
+    // コメントをAPI Route経由で削除
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/comments?id=${commentId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-    if (existingComment.length === 0) {
-      throw new Error("コメントが見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("コメントが見つかりません");
+      } else if (response.status === 403) {
+        throw new Error("このコメントを削除する権限がありません");
+      }
+      throw new Error(errorData.error || "コメントの削除に失敗しました");
     }
 
-    if (existingComment[0].userId !== userId) {
-      throw new Error("このコメントを削除する権限がありません");
-    }
-
-    // コメントを削除
-    await db.delete(comments).where(eq(comments.id, commentId));
-
-    revalidatePath(`/blog-management/${existingComment[0].postId}`);
+    // リバリデーションはAPI Route側で実行されるため、ここでは最小限のリバリデーション
     revalidatePath("/blog-management");
     revalidateTag("posts-metadata");
 
@@ -181,22 +174,28 @@ export async function getCommentForOptimisticUpdate(commentId: string) {
       return null;
     }
 
-    const comment = await db
-      .select({
-        id: comments.id,
-        content: comments.content,
-        userId: comments.userId,
-        postId: comments.postId,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-      })
-      .from(comments)
-      .where(
-        and(eq(comments.id, commentId), eq(comments.userId, currentUserId)),
-      )
-      .limit(1);
+    // コメントをAPI Route経由で取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/comments?id=${commentId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-    return comment.length > 0 ? comment[0] : null;
+    if (!response.ok) {
+      return null;
+    }
+
+    const comment = await response.json();
+    // 自分のコメントかチェック
+    if (comment.userId !== currentUserId) {
+      return null;
+    }
+
+    return comment;
   } catch (error) {
     console.error("コメント取得エラー:", error);
     return null;

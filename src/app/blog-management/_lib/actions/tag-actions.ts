@@ -1,11 +1,8 @@
 "use server";
 
-import { count, desc, eq, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth-server";
-import { db } from "@/lib/db";
-import { posts, postTags, tags } from "@/lib/db/schema";
 
 // バリデーションスキーマ
 const createTagSchema = z.object({
@@ -21,7 +18,7 @@ const updateTagSchema = createTagSchema.extend({
 });
 
 // スラッグ生成関数
-function generateSlug(name: string): string {
+function _generateSlug(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/g, "-") // 日本語文字以外をハイフンに
@@ -40,33 +37,25 @@ export async function createTag(formData: FormData) {
     };
 
     const validatedData = createTagSchema.parse(rawData);
-    const slug = generateSlug(validatedData.name);
 
-    // 同名のタグが存在しないかチェック
-    const existingTag = await db
-      .select({ id: tags.id })
-      .from(tags)
-      .where(eq(tags.slug, slug))
-      .limit(1);
+    // タグをAPI Route経由で作成
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tags`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(validatedData),
+      },
+    );
 
-    if (existingTag.length > 0) {
-      throw new Error("同名のタグが既に存在します");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "タグの作成に失敗しました");
     }
 
-    // タグをデータベースに作成
-    const [newTag] = await db
-      .insert(tags)
-      .values({
-        name: validatedData.name,
-        slug: slug,
-        color: validatedData.color,
-      })
-      .returning({
-        id: tags.id,
-        name: tags.name,
-        slug: tags.slug,
-        color: tags.color,
-      });
+    const newTag = await response.json();
 
     revalidatePath("/blog-management");
 
@@ -97,45 +86,28 @@ export async function updateTag(formData: FormData) {
     };
 
     const validatedData = updateTagSchema.parse(rawData);
-    const slug = generateSlug(validatedData.name);
 
-    // タグが存在するかチェック
-    const existingTag = await db
-      .select({ id: tags.id })
-      .from(tags)
-      .where(eq(tags.id, validatedData.id))
-      .limit(1);
+    // タグをAPI Route経由で更新
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tags`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(validatedData),
+      },
+    );
 
-    if (existingTag.length === 0) {
-      throw new Error("タグが見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("タグが見つかりません");
+      }
+      throw new Error(errorData.error || "タグの更新に失敗しました");
     }
 
-    // 同じスラッグの別のタグが存在しないかチェック（自分以外）
-    const duplicateTag = await db
-      .select({ id: tags.id })
-      .from(tags)
-      .where(eq(tags.slug, slug))
-      .limit(1);
-
-    if (duplicateTag.length > 0 && duplicateTag[0].id !== validatedData.id) {
-      throw new Error("同名のタグが既に存在します");
-    }
-
-    // タグを更新
-    const [updatedTag] = await db
-      .update(tags)
-      .set({
-        name: validatedData.name,
-        slug: slug,
-        color: validatedData.color,
-      })
-      .where(eq(tags.id, validatedData.id))
-      .returning({
-        id: tags.id,
-        name: tags.name,
-        slug: tags.slug,
-        color: tags.color,
-      });
+    const updatedTag = await response.json();
 
     revalidatePath("/blog-management");
 
@@ -164,34 +136,33 @@ export async function deleteTag(formData: FormData) {
       throw new Error("タグIDが指定されていません");
     }
 
-    // タグが存在するかチェック
-    const existingTag = await db
-      .select({ id: tags.id, name: tags.name })
-      .from(tags)
-      .where(eq(tags.id, tagId))
-      .limit(1);
+    // タグをAPI Route経由で削除
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tags?id=${tagId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-    if (existingTag.length === 0) {
-      throw new Error("タグが見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("タグが見つかりません");
+      }
+      throw new Error(errorData.error || "タグの削除に失敗しました");
     }
 
-    // タグを使用している投稿数をチェック
-    const usageCount = await db
-      .select({ count: count() })
-      .from(postTags)
-      .where(eq(postTags.tagId, tagId));
-
-    const postCount = usageCount[0]?.count || 0;
-
-    // タグを削除（cascade設定により関連する投稿タグも自動削除）
-    await db.delete(tags).where(eq(tags.id, tagId));
+    const deleteResult = await response.json();
 
     revalidatePath("/blog-management");
 
     return {
       success: true,
-      deletedTag: existingTag[0],
-      affectedPosts: postCount,
+      deletedTag: deleteResult.deletedTag,
+      affectedPosts: deleteResult.affectedPosts,
     };
   } catch (error) {
     console.error("タグ削除エラー:", error);
@@ -202,22 +173,16 @@ export async function deleteTag(formData: FormData) {
 // 人気タグを取得（使用回数順）
 export async function getPopularTags(limit: number = 10) {
   try {
-    const popularTags = await db
-      .select({
-        id: tags.id,
-        name: tags.name,
-        slug: tags.slug,
-        color: tags.color,
-        postCount: count(postTags.postId),
-      })
-      .from(tags)
-      .leftJoin(postTags, eq(tags.id, postTags.tagId))
-      .leftJoin(posts, eq(postTags.postId, posts.id))
-      .where(eq(posts.published, true)) // 公開済み投稿のみカウント
-      .groupBy(tags.id, tags.name, tags.slug, tags.color)
-      .orderBy(desc(count(postTags.postId)))
-      .limit(limit);
+    // 人気タグをAPI Route経由で取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tags?type=popular&limit=${limit}`,
+    );
 
+    if (!response.ok) {
+      throw new Error("人気タグの取得に失敗しました");
+    }
+
+    const popularTags = await response.json();
     return popularTags;
   } catch (error) {
     console.error("人気タグ取得エラー:", error);
@@ -228,35 +193,18 @@ export async function getPopularTags(limit: number = 10) {
 // タグ検索（オートコンプリート用）
 export async function searchTags(query: string, limit: number = 20) {
   try {
-    if (!query.trim()) {
-      // 空の検索の場合は全タグを最近作成順で返す
-      const allTags = await db
-        .select({
-          id: tags.id,
-          name: tags.name,
-          slug: tags.slug,
-          color: tags.color,
-        })
-        .from(tags)
-        .orderBy(desc(tags.createdAt))
-        .limit(limit);
+    const searchQuery = encodeURIComponent(query.trim());
 
-      return allTags;
+    // タグ検索をAPI Route経由で実行
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/tags?type=search&query=${searchQuery}&limit=${limit}`,
+    );
+
+    if (!response.ok) {
+      throw new Error("タグ検索に失敗しました");
     }
 
-    // タグ名での部分一致検索
-    const searchResults = await db
-      .select({
-        id: tags.id,
-        name: tags.name,
-        slug: tags.slug,
-        color: tags.color,
-      })
-      .from(tags)
-      .where(like(tags.name, `%${query}%`))
-      .orderBy(tags.name)
-      .limit(limit);
-
+    const searchResults = await response.json();
     return searchResults;
   } catch (error) {
     console.error("タグ検索エラー:", error);

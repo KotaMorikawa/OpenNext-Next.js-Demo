@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useActionState, useState } from "react";
 import { Button, Modal, Tag } from "../../_components/ui";
 import {
-  createPost,
-  deletePost,
-  updatePost,
+  type BlogFormState,
+  createPostWithState,
+  deletePostWithState,
+  updatePostWithState,
 } from "../../_lib/actions/blog-actions";
 
 type BlogEditorPresentationProps = {
@@ -33,8 +34,23 @@ export function BlogEditorPresentation({
   isOwner = true,
 }: BlogEditorPresentationProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // useActionState for form submission
+  const [createState, createAction, isCreatePending] = useActionState<
+    BlogFormState | null,
+    FormData
+  >(createPostWithState, null);
+
+  const [updateState, updateAction, isUpdatePending] = useActionState<
+    BlogFormState | null,
+    FormData
+  >(updatePostWithState, null);
+
+  const [deleteState, deleteAction, isDeletePending] = useActionState<
+    BlogFormState | null,
+    FormData
+  >(deletePostWithState, null);
 
   // フォームの状態
   const [formData, setFormData] = useState({
@@ -45,6 +61,9 @@ export function BlogEditorPresentation({
     tagIds: initialData?.tagIds || [],
     published: initialData?.published || false,
   });
+
+  // 現在のpending状態を判定
+  const isPending = isCreatePending || isUpdatePending || isDeletePending;
 
   // 権限チェック
   if (mode === "edit" && !isOwner) {
@@ -65,60 +84,22 @@ export function BlogEditorPresentation({
     );
   }
 
-  const handleSubmit = async (formDataParam: FormData) => {
-    startTransition(async () => {
-      try {
-        if (mode === "create") {
-          await createPost(formDataParam);
-        } else if (initialData) {
-          formDataParam.append("id", initialData.id);
-          await updatePost(formDataParam);
-        }
-        // 成功時は何もしない（Server Actionがリダイレクト処理）
-      } catch (error: any) {
-        // エラーメッセージに「NEXT_REDIRECT」が含まれる場合は無視
-        if (
-          error?.message?.includes("NEXT_REDIRECT") ||
-          error?.digest?.includes("NEXT_REDIRECT")
-        ) {
-          return; // リダイレクトは成功している
-        }
-
-        // 本当のエラーのみ表示
-        console.error("投稿エラー:", error);
-        alert(
-          `投稿の${mode === "create" ? "作成" : "更新"}に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`,
-        );
-      }
-    });
+  const handleSubmit = (formDataParam: FormData) => {
+    if (mode === "create") {
+      createAction(formDataParam);
+    } else if (initialData) {
+      formDataParam.append("id", initialData.id);
+      updateAction(formDataParam);
+    }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!initialData) return;
 
-    startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.append("id", initialData.id);
-        await deletePost(formData);
-        setShowDeleteConfirm(false);
-      } catch (error: any) {
-        // エラーメッセージに「NEXT_REDIRECT」が含まれる場合は無視
-        if (
-          error?.message?.includes("NEXT_REDIRECT") ||
-          error?.digest?.includes("NEXT_REDIRECT")
-        ) {
-          setShowDeleteConfirm(false); // モーダルを閉じる
-          return; // リダイレクトは成功している
-        }
-
-        // 本当のエラーのみ表示
-        console.error("削除エラー:", error);
-        alert(
-          `投稿の削除に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`,
-        );
-      }
-    });
+    const formData = new FormData();
+    formData.append("id", initialData.id);
+    deleteAction(formData);
+    setShowDeleteConfirm(false);
   };
 
   const handleTagToggle = (tagId: string) => {
@@ -330,6 +311,40 @@ export function BlogEditorPresentation({
           </div>
         </form>
 
+        {/* エラー・成功メッセージ表示 */}
+        {(createState || updateState) && (
+          <div
+            className={`mt-6 p-4 rounded-md ${
+              createState?.success || updateState?.success
+                ? "bg-green-50 border border-green-200"
+                : "bg-red-50 border border-red-200"
+            }`}
+          >
+            <p
+              className={`text-sm font-medium ${
+                createState?.success || updateState?.success
+                  ? "text-green-800"
+                  : "text-red-800"
+              }`}
+            >
+              {createState?.message || updateState?.message}
+            </p>
+
+            {/* バリデーションエラーの詳細表示 */}
+            {(createState?.errors || updateState?.errors) && (
+              <ul className="mt-2 text-xs text-red-600">
+                {Object.entries(
+                  createState?.errors || updateState?.errors || {},
+                ).map(([field, message]) => (
+                  <li key={field}>
+                    {field}: {message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* 削除確認モーダル */}
         <Modal
           isOpen={showDeleteConfirm}
@@ -339,6 +354,16 @@ export function BlogEditorPresentation({
           <p className="text-gray-600 mb-6">
             この投稿を削除してもよろしいですか？この操作は取り消せません。
           </p>
+
+          {/* 削除エラーの表示 */}
+          {deleteState && !deleteState.success && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm font-medium text-red-800">
+                {deleteState.message}
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-4">
             <Button
               variant="danger"

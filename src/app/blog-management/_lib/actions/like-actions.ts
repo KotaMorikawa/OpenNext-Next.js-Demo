@@ -1,11 +1,8 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { getCurrentUserId, requireAuth } from "@/lib/auth-server";
-import { db } from "@/lib/db";
-import { likes, posts } from "@/lib/db/schema";
 
 // バリデーションスキーマ
 const likePostSchema = z.object({
@@ -16,7 +13,7 @@ const likePostSchema = z.object({
 export async function toggleLike(formData: FormData) {
   try {
     const session = await requireAuth();
-    const userId = session.user.id;
+    const _userId = session.user.id;
 
     const rawData = {
       postId: formData.get("postId")?.toString() || "",
@@ -24,48 +21,31 @@ export async function toggleLike(formData: FormData) {
 
     const validatedData = likePostSchema.parse(rawData);
 
-    // 投稿が存在するかチェック
-    const postExists = await db
-      .select({ id: posts.id })
-      .from(posts)
-      .where(eq(posts.id, validatedData.postId))
-      .limit(1);
+    // いいねをAPI Route経由で切り替え
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/likes`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postId: validatedData.postId,
+        }),
+      },
+    );
 
-    if (postExists.length === 0) {
-      throw new Error("投稿が見つかりません");
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 404) {
+        throw new Error("投稿が見つかりません");
+      }
+      throw new Error(errorData.error || "いいねの処理に失敗しました");
     }
 
-    // 既存のいいねをチェック
-    const existingLike = await db
-      .select({ id: likes.id })
-      .from(likes)
-      .where(
-        and(eq(likes.postId, validatedData.postId), eq(likes.userId, userId)),
-      )
-      .limit(1);
-
-    let isLiked: boolean;
-
-    if (existingLike.length > 0) {
-      // いいねが存在する場合は削除
-      await db.delete(likes).where(eq(likes.id, existingLike[0].id));
-      isLiked = false;
-    } else {
-      // いいねが存在しない場合は追加
-      await db.insert(likes).values({
-        postId: validatedData.postId,
-        userId: userId,
-      });
-      isLiked = true;
-    }
-
-    // いいね数を取得
-    const likeCountResult = await db
-      .select({ count: count() })
-      .from(likes)
-      .where(eq(likes.postId, validatedData.postId));
-
-    const likeCount = likeCountResult[0]?.count || 0;
+    const likeData = await response.json();
+    const isLiked = likeData.isLiked;
+    const likeCount = likeData.likeCount;
 
     revalidatePath(`/blog-management/${validatedData.postId}`);
     revalidatePath("/blog-management");
@@ -90,31 +70,22 @@ export async function toggleLike(formData: FormData) {
 // 特定の投稿のいいね状態を取得（楽観的UI更新用）
 export async function getLikeStatus(postId: string) {
   try {
-    const currentUserId = await getCurrentUserId();
+    const _currentUserId = await getCurrentUserId();
 
-    // いいね数を取得
-    const likeCountResult = await db
-      .select({ count: count() })
-      .from(likes)
-      .where(eq(likes.postId, postId));
+    // いいね状態をAPI Route経由で取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/likes?postId=${postId}`,
+    );
 
-    const likeCount = likeCountResult[0]?.count || 0;
-
-    // ログイン済みの場合はユーザーのいいね状態もチェック
-    let isLikedByUser = false;
-    if (currentUserId) {
-      const userLike = await db
-        .select({ id: likes.id })
-        .from(likes)
-        .where(and(eq(likes.postId, postId), eq(likes.userId, currentUserId)))
-        .limit(1);
-
-      isLikedByUser = userLike.length > 0;
+    if (!response.ok) {
+      throw new Error("いいね状態の取得に失敗しました");
     }
 
+    const likeData = await response.json();
+
     return {
-      likeCount,
-      isLikedByUser,
+      likeCount: likeData.likeCount,
+      isLikedByUser: likeData.isLiked,
     };
   } catch (error) {
     console.error("いいね状態取得エラー:", error);
@@ -128,49 +99,33 @@ export async function getLikeStatus(postId: string) {
 // 複数投稿のいいね数を一括取得（N+1問題対策用）
 export async function getBulkLikeStatus(postIds: string[]) {
   try {
-    const currentUserId = await getCurrentUserId();
+    const _currentUserId = await getCurrentUserId();
 
     if (postIds.length === 0) {
       return {};
     }
 
-    // 各投稿のいいね数を取得
-    const likeCountResults = await db
-      .select({
-        postId: likes.postId,
-        count: count(),
-      })
-      .from(likes)
-      .where(eq(likes.postId, postIds[0])) // TODO: IN句に対応する必要がある
-      .groupBy(likes.postId);
+    // API Routes経由で複数投稿のいいね状態を一括取得
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/likes?postIds=${postIds.join(",")}`,
+    );
 
-    // ユーザーのいいね状態を取得（ログイン済みの場合）
-    let userLikes: string[] = [];
-    if (currentUserId) {
-      const userLikeResults = await db
-        .select({ postId: likes.postId })
-        .from(likes)
-        .where(
-          and(
-            eq(likes.userId, currentUserId),
-            // TODO: postId IN (postIds) に対応する必要がある
-          ),
-        );
-
-      userLikes = userLikeResults.map((result) => result.postId);
+    if (!response.ok) {
+      throw new Error("いいね状態の取得に失敗しました");
     }
 
-    // 結果をオブジェクトに変換
+    const likesData = await response.json();
+
+    // APIレスポンスを期待される形式に変換
     const result: Record<
       string,
       { likeCount: number; isLikedByUser: boolean }
     > = {};
 
-    for (const postId of postIds) {
-      const likeCountData = likeCountResults.find((r) => r.postId === postId);
-      result[postId] = {
-        likeCount: likeCountData?.count || 0,
-        isLikedByUser: userLikes.includes(postId),
+    for (const likeData of likesData) {
+      result[likeData.postId] = {
+        likeCount: likeData.likeCount,
+        isLikedByUser: likeData.isLiked,
       };
     }
 

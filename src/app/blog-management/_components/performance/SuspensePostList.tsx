@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { TitlesSkeleton, MetadataSkeleton, TagsSkeleton, Tag } from "../ui";
+import { Tag } from "../ui";
 
 interface PostData {
   id: string;
