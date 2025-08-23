@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import N1VerificationContainer from "./_containers/n1-verification-container";
+import N1VerificationContainer from "./_containers/n1-verification";
 
 export const metadata: Metadata = {
   title: "N+1問題検証 | OpenNext Demo",

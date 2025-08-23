@@ -1,14 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import CodeExamplesSection from "../_components/CodeExamplesSection";
-import OverviewSection from "../_components/OverviewSection";
-import PerformanceComparisonSection from "../_components/PerformanceComparisonSection";
+import CodeExamplesSection from "../../_components/CodeExamplesSection";
+import OverviewSection from "../../_components/OverviewSection";
+import PerformanceComparisonSection from "../../_components/PerformanceComparisonSection";
 
-export default function N1VerificationContainer() {
+type Tab = {
+  id: string;
+  label: string;
+  icon: string;
+};
+
+// Presentational Component: 状態管理とUIを担当
+export function N1VerificationPresentation() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  const tabs = [
+  const tabs: Tab[] = [
     { id: "overview", label: "概要", icon: "📖" },
     { id: "performance", label: "パフォーマンス比較", icon: "📊" },
     { id: "code-examples", label: "コード例", icon: "💻" },

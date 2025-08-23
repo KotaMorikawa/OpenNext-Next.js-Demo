@@ -16,7 +16,8 @@ export default async function PostPage({
 export async function generateStaticParams() {
   const posts = await getAllPosts();
 
-  return posts.map((post) => ({
+  // ビルド時の接続数制限を回避するため、最初の10件のみを静的生成
+  return posts.slice(0, 10).map((post) => ({
     id: post.id,
   }));
 }
