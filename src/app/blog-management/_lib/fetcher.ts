@@ -1,486 +1,336 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
-import { cache } from "react";
-import { getCurrentUserId } from "@/lib/auth-server";
-import { db } from "@/lib/db";
-import {
-  categories,
-  comments,
-  likes,
-  posts,
-  postTags,
-  tags,
-  user,
-} from "@/lib/db/schema";
+// API Route Handler経由でデータを取得する fetcher 関数集
 
-// Request Memoizationを活用した投稿データ取得関数
-export const getAllPosts = cache(async () => {
-  const allPosts = await db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published: posts.published,
-      createdAt: posts.createdAt,
-      updatedAt: posts.updatedAt,
-      authorName: user.name,
-      authorEmail: user.email,
-    })
-    .from(posts)
-    .leftJoin(user, eq(posts.authorId, user.id))
-    .where(eq(posts.published, true))
-    .orderBy(desc(posts.createdAt));
+import type {
+  ApiError,
+  BulkPostMetadata,
+  Category,
+  Comment,
+  PerformanceResult,
+  Post,
+  PostWithFullData,
+  PostWithMetadata,
+  TagWithCount,
+} from "@/lib/types/api";
+import { isApiError } from "@/lib/types/api";
 
-  return allPosts;
-});
+// Server Component用のベースURL取得
+function getBaseUrl(): string {
+  if (typeof window !== "undefined") return ""; // ブラウザではrelative URL
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+}
 
-export const getPostById = cache(async (id: string) => {
-  const post = await db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published: posts.published,
-      createdAt: posts.createdAt,
-      updatedAt: posts.updatedAt,
-      authorName: user.name,
-      authorEmail: user.email,
-    })
-    .from(posts)
-    .leftJoin(user, eq(posts.authorId, user.id))
-    .where(eq(posts.id, id))
-    .limit(1);
+// エラーハンドリング用のヘルパー関数
+async function handleApiResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
 
-  return post.length > 0 ? post[0] : null;
-});
+    try {
+      const errorData: ApiError = await response.json();
+      if (errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch {
+      // JSONパースに失敗した場合はデフォルトメッセージを使用
+    }
 
-export const getPostsByAuthor = cache(async (authorId: string) => {
-  const authorPosts = await db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published: posts.published,
-      createdAt: posts.createdAt,
-      updatedAt: posts.updatedAt,
-      authorName: user.name,
-      authorEmail: user.email,
-    })
-    .from(posts)
-    .leftJoin(user, eq(posts.authorId, user.id))
-    .where(eq(posts.authorId, authorId))
-    .orderBy(desc(posts.createdAt));
+    throw new Error(errorMessage);
+  }
 
-  return authorPosts;
-});
+  const data = await response.json();
 
-// データベース初期化用のシードデータ作成関数
-export const createSamplePosts = cache(async () => {
-  // まずユーザーを作成
-  const sampleUsers = await db
-    .insert(user)
-    .values([
-      {
-        id: "550e8400-e29b-41d4-a716-446655440001",
-        name: "山田太郎",
-        email: "yamada@example.com",
-        emailVerified: true,
-      },
-      {
-        id: "550e8400-e29b-41d4-a716-446655440002",
-        name: "田中花子",
-        email: "tanaka@example.com",
-        emailVerified: true,
-      },
-    ])
-    .onConflictDoNothing()
-    .returning();
+  if (isApiError(data)) {
+    throw new Error(data.error);
+  }
 
-  // 投稿を作成
-  const samplePosts = await db
-    .insert(posts)
-    .values([
-      {
-        id: "550e8400-e29b-41d4-a716-446655440101",
-        title: "Next.js 15の新機能",
-        content: `
-Next.js 15では多くの新機能と改善が追加されました。主な変更点を見ていきましょう。
+  return data as T;
+}
 
-## React Server Components
-React Server Componentsがより安定し、パフォーマンスが大幅に向上しました。
+// === 基本投稿データ取得 ===
 
-## Turbopack
-ビルド時間が大幅に短縮され、開発体験が改善されています。
+export const getAllPosts = async (): Promise<Post[]> => {
+  const response = await fetch(`${getBaseUrl()}/api/posts?type=published`, {
+    cache: "force-cache",
+  });
 
-## App Router
-新しいApp Routerにより、レイアウトやナビゲーションがより柔軟になりました。
-        `.trim(),
-        excerpt: "Next.js 15の主要な新機能について詳しく解説します。",
-        published: true,
-        authorId: "550e8400-e29b-41d4-a716-446655440001",
-      },
-      {
-        id: "550e8400-e29b-41d4-a716-446655440102",
-        title: "React 19とServer Components",
-        content: `
-React 19では、Server Componentsが正式にサポートされ、
-新たなhooksやAPIが追加されました。
+  return handleApiResponse(response);
+};
 
-## useActionState
-フォームの状態管理が簡単になるuseActionStateが追加されました。
+export const getPostById = async (id: string): Promise<Post | null> => {
+  const response = await fetch(`${getBaseUrl()}/api/posts?postId=${id}`, {
+    cache: "default",
+  });
 
-## Server Actions
-サーバーサイド処理をより簡単に実装できるようになりました。
+  return handleApiResponse(response);
+};
 
-## 互換性
-既存のReactアプリとの互換性も保たれています。
-        `.trim(),
-        excerpt: "React 19の新機能とServer Componentsについて解説します。",
-        published: true,
-        authorId: "550e8400-e29b-41d4-a716-446655440002",
-      },
-      {
-        id: "550e8400-e29b-41d4-a716-446655440103",
-        title: "TypeScript 5.4の改善点",
-        content: `
-TypeScript 5.4では、型推論の改善やパフォーマンスの向上が行われました。
+export const getPostsByAuthor = async (authorId: string): Promise<Post[]> => {
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts?authorId=${authorId}`,
+    {
+      cache: "default",
+    },
+  );
 
-## 型推論の改善
-より正確な型推論により、開発体験が向上しました。
-
-## パフォーマンス
-コンパイル速度が大幅に改善されています。
-
-## 新機能
-新しい便利な機能も多数追加されています。
-        `.trim(),
-        excerpt: "TypeScript 5.4の新機能と改善点について説明します。",
-        published: true,
-        authorId: "550e8400-e29b-41d4-a716-446655440001",
-      },
-    ])
-    .onConflictDoNothing()
-    .returning();
-
-  return { user: sampleUsers, posts: samplePosts };
-});
+  return handleApiResponse(response);
+};
 
 // === Blog Management機能用の拡張データ取得関数 ===
 
-// 全ユーザーの投稿（公開・非公開を含む）
-export const getAllPostsWithMetadata = cache(async () => {
-  const allPosts = await db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published: posts.published,
-      createdAt: posts.createdAt,
-      updatedAt: posts.updatedAt,
-      authorId: posts.authorId,
-      authorName: user.name,
-      authorEmail: user.email,
-      categoryId: posts.categoryId,
-      categoryName: categories.name,
-    })
-    .from(posts)
-    .leftJoin(user, eq(posts.authorId, user.id))
-    .leftJoin(categories, eq(posts.categoryId, categories.id))
-    .orderBy(desc(posts.createdAt));
+export const getAllPostsWithMetadata = async (): Promise<
+  PostWithMetadata[]
+> => {
+  const response = await fetch(`${getBaseUrl()}/api/posts?type=all`, {
+    cache: "default",
+  });
 
-  return allPosts;
-});
+  return handleApiResponse(response);
+};
 
-// 自分の投稿のみを取得（認証必須）
-export const getMyPosts = cache(async () => {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return [];
-  }
+export const getMyPosts = async (): Promise<PostWithMetadata[]> => {
+  const response = await fetch(`${getBaseUrl()}/api/posts?type=my`, {
+    cache: "no-store",
+  });
 
-  const myPosts = await db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published: posts.published,
-      createdAt: posts.createdAt,
-      updatedAt: posts.updatedAt,
-      authorId: posts.authorId,
-      authorName: user.name,
-      categoryId: posts.categoryId,
-      categoryName: categories.name,
-    })
-    .from(posts)
-    .leftJoin(user, eq(posts.authorId, user.id))
-    .leftJoin(categories, eq(posts.categoryId, categories.id))
-    .where(eq(posts.authorId, userId))
-    .orderBy(desc(posts.createdAt));
+  return handleApiResponse(response);
+};
 
-  return myPosts;
-});
+export const getPostWithFullData = async (
+  id: string,
+): Promise<PostWithFullData | null> => {
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/metadata?type=full&postId=${id}`,
+    {
+      cache: "default",
+    },
+  );
 
-// 投稿詳細（コメント・いいね・タグ込み）
-export const getPostWithFullData = cache(async (id: string) => {
-  const post = await db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      content: posts.content,
-      excerpt: posts.excerpt,
-      published: posts.published,
-      createdAt: posts.createdAt,
-      updatedAt: posts.updatedAt,
-      authorId: posts.authorId,
-      authorName: user.name,
-      authorEmail: user.email,
-      categoryId: posts.categoryId,
-      categoryName: categories.name,
-    })
-    .from(posts)
-    .leftJoin(user, eq(posts.authorId, user.id))
-    .leftJoin(categories, eq(posts.categoryId, categories.id))
-    .where(eq(posts.id, id))
-    .limit(1);
+  return handleApiResponse(response);
+};
 
-  if (post.length === 0) {
-    return null;
-  }
+// === カテゴリーとタグ取得 ===
 
-  // タグを取得
-  const postTagsData = await db
-    .select({
-      id: tags.id,
-      name: tags.name,
-      slug: tags.slug,
-      color: tags.color,
-    })
-    .from(tags)
-    .innerJoin(postTags, eq(tags.id, postTags.tagId))
-    .where(eq(postTags.postId, id))
-    .orderBy(tags.name);
+export const getAllCategories = async (): Promise<Category[]> => {
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/metadata?type=categories`,
+    {
+      cache: "force-cache",
+    },
+  );
 
-  // コメントを取得
-  const postComments = await db
-    .select({
-      id: comments.id,
-      content: comments.content,
-      createdAt: comments.createdAt,
-      updatedAt: comments.updatedAt,
-      userId: comments.userId,
-      userName: user.name,
-      userEmail: user.email,
-    })
-    .from(comments)
-    .leftJoin(user, eq(comments.userId, user.id))
-    .where(eq(comments.postId, id))
-    .orderBy(desc(comments.createdAt));
+  return handleApiResponse(response);
+};
 
-  // いいね数を取得
-  const likeCountResult = await db
-    .select({ count: count() })
-    .from(likes)
-    .where(eq(likes.postId, id));
+export const getAllTags = async (): Promise<TagWithCount[]> => {
+  const response = await fetch(`${getBaseUrl()}/api/posts/metadata?type=tags`, {
+    cache: "force-cache",
+  });
 
-  // 現在のユーザーのいいね状態をチェック
-  const currentUserId = await getCurrentUserId();
-  let isLikedByUser = false;
-  if (currentUserId) {
-    const userLike = await db
-      .select({ id: likes.id })
-      .from(likes)
-      .where(and(eq(likes.postId, id), eq(likes.userId, currentUserId)))
-      .limit(1);
-    isLikedByUser = userLike.length > 0;
-  }
+  return handleApiResponse(response);
+};
 
-  return {
-    ...post[0],
-    tags: postTagsData,
-    comments: postComments,
-    likeCount: likeCountResult[0]?.count || 0,
-    isLikedByUser,
-    isOwnPost: currentUserId === post[0].authorId,
-  };
-});
+// === コメント取得 ===
 
-// カテゴリー一覧を取得
-export const getAllCategories = cache(async () => {
-  const allCategories = await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      slug: categories.slug,
-      description: categories.description,
-      postCount: count(posts.id),
-    })
-    .from(categories)
-    .leftJoin(
-      posts,
-      and(eq(categories.id, posts.categoryId), eq(posts.published, true)),
-    )
-    .groupBy(
-      categories.id,
-      categories.name,
-      categories.slug,
-      categories.description,
-    )
-    .orderBy(categories.name);
+export const getCommentsByPostId = async (
+  postId: string,
+): Promise<Comment[]> => {
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/metadata?type=comments&postId=${postId}`,
+    {
+      cache: "default",
+    },
+  );
 
-  return allCategories;
-});
+  return handleApiResponse(response);
+};
 
-// タグ一覧を取得
-export const getAllTags = cache(async () => {
-  const allTags = await db
-    .select({
-      id: tags.id,
-      name: tags.name,
-      slug: tags.slug,
-      color: tags.color,
-      postCount: count(postTags.postId),
-    })
-    .from(tags)
-    .leftJoin(postTags, eq(tags.id, postTags.tagId))
-    .leftJoin(
-      posts,
-      and(eq(postTags.postId, posts.id), eq(posts.published, true)),
-    )
-    .groupBy(tags.id, tags.name, tags.slug, tags.color)
-    .orderBy(tags.name);
+// === DataLoader パターン - 複数投稿のメタデータを一括取得 ===
 
-  return allTags;
-});
-
-// 投稿のコメント一覧を取得
-export const getCommentsByPostId = cache(async (postId: string) => {
-  const postComments = await db
-    .select({
-      id: comments.id,
-      content: comments.content,
-      createdAt: comments.createdAt,
-      updatedAt: comments.updatedAt,
-      userId: comments.userId,
-      userName: user.name,
-      userEmail: user.email,
-    })
-    .from(comments)
-    .leftJoin(user, eq(comments.userId, user.id))
-    .where(eq(comments.postId, postId))
-    .orderBy(desc(comments.createdAt));
-
-  // 現在のユーザーIDを取得して、編集可能なコメントにマークを付ける
-  const currentUserId = await getCurrentUserId();
-  return postComments.map((comment) => ({
-    ...comment,
-    canEdit: currentUserId === comment.userId,
-  }));
-});
-
-// DataLoader パターン - 複数投稿のメタデータを一括取得
-export const getBulkPostMetadata = cache(async (postIds: string[]) => {
+export const getBulkPostMetadata = async (
+  postIds: string[],
+): Promise<BulkPostMetadata> => {
   if (postIds.length === 0) {
     return {};
   }
 
-  // いいね数を一括取得
-  const likeCountsRaw = await db
-    .select({
-      postId: likes.postId,
-      count: count(),
-    })
-    .from(likes)
-    .where(sql`${likes.postId} = ANY(${postIds})`)
-    .groupBy(likes.postId);
-
-  // コメント数を一括取得
-  const commentCountsRaw = await db
-    .select({
-      postId: comments.postId,
-      count: count(),
-    })
-    .from(comments)
-    .where(sql`${comments.postId} = ANY(${postIds})`)
-    .groupBy(comments.postId);
-
-  // タグを一括取得
-  const tagsRaw = await db
-    .select({
-      postId: postTags.postId,
-      tagId: tags.id,
-      tagName: tags.name,
-      tagColor: tags.color,
-    })
-    .from(postTags)
-    .innerJoin(tags, eq(postTags.tagId, tags.id))
-    .where(sql`${postTags.postId} = ANY(${postIds})`);
-
-  // 現在のユーザーのいいね状態を取得
-  const currentUserId = await getCurrentUserId();
-  let userLikes: string[] = [];
-  if (currentUserId) {
-    const userLikesRaw = await db
-      .select({ postId: likes.postId })
-      .from(likes)
-      .where(
-        and(
-          eq(likes.userId, currentUserId),
-          sql`${likes.postId} = ANY(${postIds})`,
-        ),
-      );
-    userLikes = userLikesRaw.map((like) => like.postId);
-  }
-
-  // データを整理してオブジェクト形式で返す
-  const result: Record<
-    string,
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/metadata?type=bulk&postIds=${postIds.join(",")}`,
     {
-      likeCount: number;
-      commentCount: number;
-      tags: Array<{ id: string; name: string; color: string }>;
-      isLikedByUser: boolean;
-    }
-  > = {};
+      cache: "force-cache",
+    },
+  );
 
-  // 初期値を設定
-  for (const postId of postIds) {
-    result[postId] = {
-      likeCount: 0,
-      commentCount: 0,
-      tags: [],
-      isLikedByUser: false,
-    };
+  return handleApiResponse(response);
+};
+
+// === パフォーマンス比較用の実装パターン ===
+
+// パターン1: キャッシュなし（毎回API経由）
+export const getAllPosts_NoCache = async (): Promise<
+  PerformanceResult<PostWithMetadata[]>
+> => {
+  const startTime = performance.now();
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/cache-patterns?pattern=no-cache&dataType=posts`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`投稿の取得に失敗しました: ${response.statusText}`);
   }
 
-  // いいね数を設定
-  for (const item of likeCountsRaw) {
-    result[item.postId].likeCount = item.count;
+  const result = await response.json();
+  const endTime = performance.now();
+
+  return {
+    ...result,
+    executionTime: endTime - startTime, // APIリクエスト時間を含む
+  };
+};
+
+export const getBulkPostMetadata_NoCache = async (
+  postIds: string[],
+): Promise<PerformanceResult<BulkPostMetadata>> => {
+  if (postIds.length === 0) {
+    return { data: {}, executionTime: 0 };
   }
 
-  // コメント数を設定
-  for (const item of commentCountsRaw) {
-    result[item.postId].commentCount = item.count;
+  const startTime = performance.now();
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/cache-patterns?pattern=no-cache&dataType=metadata&postIds=${postIds.join(",")}`,
+    { cache: "no-store" },
+  );
+
+  if (!response.ok) {
+    throw new Error(`メタデータの取得に失敗しました: ${response.statusText}`);
   }
 
-  // タグを設定
-  for (const item of tagsRaw) {
-    result[item.postId].tags.push({
-      id: item.tagId,
-      name: item.tagName,
-      color: item.tagColor || "#6b7280",
-    });
+  const result = await response.json();
+  const endTime = performance.now();
+
+  return {
+    ...result,
+    executionTime: endTime - startTime, // APIリクエスト時間を含む
+  };
+};
+
+// パターン2: リクエストキャッシュ（Next.jsのデフォルト）
+export const getAllPosts_RequestCache = async (): Promise<
+  PerformanceResult<PostWithMetadata[]>
+> => {
+  const startTime = performance.now();
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/cache-patterns?pattern=request-cache&dataType=posts`,
+    {
+      cache: "default",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`投稿の取得に失敗しました: ${response.statusText}`);
   }
 
-  // いいね状態を設定
-  for (const postId of userLikes) {
-    if (result[postId]) {
-      result[postId].isLikedByUser = true;
-    }
+  const result = await response.json();
+  const endTime = performance.now();
+
+  return {
+    ...result,
+    executionTime: endTime - startTime,
+  };
+};
+
+export const getBulkPostMetadata_RequestCache = async (
+  postIds: string[],
+): Promise<PerformanceResult<BulkPostMetadata>> => {
+  if (postIds.length === 0) {
+    return { data: {}, executionTime: 0 };
   }
 
-  return result;
-});
+  const startTime = performance.now();
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/cache-patterns?pattern=request-cache&dataType=metadata&postIds=${postIds.join(",")}`,
+    { cache: "default" },
+  );
+
+  if (!response.ok) {
+    throw new Error(`メタデータの取得に失敗しました: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  const endTime = performance.now();
+
+  return {
+    ...result,
+    executionTime: endTime - startTime,
+  };
+};
+
+// パターン3: 強制キャッシュ（force-cache相当）
+export const getAllPosts_ForceCache = async (): Promise<
+  PerformanceResult<PostWithMetadata[]>
+> => {
+  const startTime = performance.now();
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/cache-patterns?pattern=force-cache&dataType=posts`,
+    {
+      cache: "force-cache",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`投稿の取得に失敗しました: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  const endTime = performance.now();
+
+  return {
+    ...result,
+    executionTime: endTime - startTime,
+  };
+};
+
+export const getBulkPostMetadata_ForceCache = async (
+  postIds: string[],
+): Promise<PerformanceResult<BulkPostMetadata>> => {
+  if (postIds.length === 0) {
+    return { data: {}, executionTime: 0 };
+  }
+
+  const startTime = performance.now();
+
+  const response = await fetch(
+    `${getBaseUrl()}/api/posts/cache-patterns?pattern=force-cache&dataType=metadata&postIds=${postIds.join(",")}`,
+    { cache: "force-cache" },
+  );
+
+  if (!response.ok) {
+    throw new Error(`メタデータの取得に失敗しました: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  const endTime = performance.now();
+
+  return {
+    ...result,
+    executionTime: endTime - startTime,
+  };
+};
+
+// === データベース初期化用（API経由で実行） ===
+
+export const createSamplePosts = async (): Promise<unknown> => {
+  const response = await fetch(`${getBaseUrl()}/api/batch/seed`, {
+    method: "POST",
+    cache: "no-store",
+  });
+
+  return handleApiResponse(response);
+};

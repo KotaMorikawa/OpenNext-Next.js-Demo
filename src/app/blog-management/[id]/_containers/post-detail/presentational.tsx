@@ -31,7 +31,7 @@ type PostDetailPresentationProps = {
     tags: Array<{
       id: string;
       name: string;
-      slug: string;
+      slug?: string;
       color: string | null;
     }>;
     comments: Array<{

@@ -12,15 +12,7 @@ export default async function PostPage({
   return <PostDetailContainer postId={id} />;
 }
 
-// 静的生成パラメータ：データベースから実際のpost IDを取得
-export async function generateStaticParams() {
-  const posts = await getAllPosts();
-
-  // ビルド時の接続数制限を回避するため、最初の10件のみを静的生成
-  return posts.slice(0, 10).map((post) => ({
-    id: post.id,
-  }));
-}
+// 動的レンダリング：generateStaticParamsを削除してSSGを無効化
 
 // メタデータ生成
 export async function generateMetadata({

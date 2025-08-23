@@ -1,5 +1,5 @@
-import { getPostWithFullData } from "../../_lib/fetcher";
 import { BlogEditorContainer } from "../../_containers/blog-editor";
+import { getPostWithFullData } from "../../_lib/fetcher";
 
 type EditPostPageProps = {
   params: Promise<{ id: string }>;

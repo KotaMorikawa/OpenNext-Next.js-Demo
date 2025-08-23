@@ -1,7 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth-server";
@@ -27,17 +27,21 @@ const updatePostSchema = createPostSchema.extend({
 
 // 投稿作成Action
 export async function createPost(formData: FormData) {
+  let redirectTo = "";
+
   try {
     const session = await requireAuth();
     const userId = session.user.id;
+
+    const categoryId = formData.get("categoryId")?.toString();
 
     const rawData = {
       title: formData.get("title")?.toString() || "",
       content: formData.get("content")?.toString() || "",
       excerpt: formData.get("excerpt")?.toString() || "",
-      categoryId: formData.get("categoryId")?.toString(),
+      categoryId: !categoryId || categoryId === "" ? undefined : categoryId,
       tagIds: formData.getAll("tagIds").filter((id) => id) as string[],
-      published: formData.get("published") === "true",
+      published: formData.get("published") === "on",
     };
 
     const validatedData = createPostSchema.parse(rawData);
@@ -66,14 +70,17 @@ export async function createPost(formData: FormData) {
     }
 
     revalidatePath("/blog-management");
+    revalidateTag("posts");
 
+    // 成功時のリダイレクト先を設定
     if (validatedData.published) {
-      redirect(`/blog-management/${newPost.id}`);
+      redirectTo = `/blog-management/${newPost.id}`;
     } else {
-      redirect("/blog-management");
+      redirectTo = "/blog-management";
     }
   } catch (error) {
     console.error("投稿作成エラー:", error);
+
     if (error instanceof z.ZodError) {
       throw new Error(
         `バリデーションエラー: ${error.issues.map((e) => e.message).join(", ")}`,
@@ -81,22 +88,31 @@ export async function createPost(formData: FormData) {
     }
     throw new Error("投稿の作成に失敗しました");
   }
+
+  // try-catchの外で条件付きリダイレクト
+  if (redirectTo !== "") {
+    redirect(redirectTo);
+  }
 }
 
 // 投稿更新Action
 export async function updatePost(formData: FormData) {
+  let redirectTo = "";
+
   try {
     const session = await requireAuth();
     const userId = session.user.id;
+
+    const categoryId = formData.get("categoryId")?.toString();
 
     const rawData = {
       id: formData.get("id")?.toString() || "",
       title: formData.get("title")?.toString() || "",
       content: formData.get("content")?.toString() || "",
       excerpt: formData.get("excerpt")?.toString() || "",
-      categoryId: formData.get("categoryId")?.toString(),
+      categoryId: !categoryId || categoryId === "" ? undefined : categoryId,
       tagIds: formData.getAll("tagIds").filter((id) => id) as string[],
-      published: formData.get("published") === "true",
+      published: formData.get("published") === "on",
     };
 
     const validatedData = updatePostSchema.parse(rawData);
@@ -144,10 +160,14 @@ export async function updatePost(formData: FormData) {
 
     revalidatePath("/blog-management");
     revalidatePath(`/blog-management/${validatedData.id}`);
+    revalidateTag("posts");
+    revalidateTag("posts-metadata");
 
-    redirect(`/blog-management/${validatedData.id}`);
+    // 成功時のリダイレクト先を設定
+    redirectTo = `/blog-management/${validatedData.id}`;
   } catch (error) {
     console.error("投稿更新エラー:", error);
+
     if (error instanceof z.ZodError) {
       throw new Error(
         `バリデーションエラー: ${error.issues.map((e) => e.message).join(", ")}`,
@@ -155,10 +175,17 @@ export async function updatePost(formData: FormData) {
     }
     throw error;
   }
+
+  // try-catchの外で条件付きリダイレクト
+  if (redirectTo !== "") {
+    redirect(redirectTo);
+  }
 }
 
 // 投稿削除Action
 export async function deletePost(formData: FormData) {
+  let redirectTo = "";
+
   try {
     const session = await requireAuth();
     const userId = session.user.id;
@@ -187,10 +214,19 @@ export async function deletePost(formData: FormData) {
     await db.delete(posts).where(eq(posts.id, postId));
 
     revalidatePath("/blog-management");
-    redirect("/blog-management");
+    revalidateTag("posts");
+    revalidateTag("posts-metadata");
+
+    // 成功時のリダイレクト先を設定
+    redirectTo = "/blog-management";
   } catch (error) {
     console.error("投稿削除エラー:", error);
     throw error;
+  }
+
+  // try-catchの外で条件付きリダイレクト
+  if (redirectTo !== "") {
+    redirect(redirectTo);
   }
 }
 
@@ -233,6 +269,8 @@ export async function togglePostPublished(formData: FormData) {
 
     revalidatePath("/blog-management");
     revalidatePath(`/blog-management/${postId}`);
+    revalidateTag("posts");
+    revalidateTag("posts-metadata");
 
     return { success: true };
   } catch (error) {

@@ -1,26 +1,28 @@
 import { getCurrentUserId } from "@/lib/auth-server";
-import {
-  getAllPostsWithMetadata,
-  getBulkPostMetadata,
-  getMyPosts,
-} from "../../_lib/fetcher";
+import { getBulkPostMetadata } from "../../_lib/fetcher";
+import { getPostsPaginated } from "@/app/api/_lib/db/queries/posts";
 import { PostsListPresentation } from "./presentational";
 
 type PostsListContainerProps = {
   view?: "all" | "my";
+  page?: number;
+  limit?: number;
 };
 
 // Container Component: データフェッチのみを担当
 export async function PostsListContainer({
   view = "all",
+  page = 1,
+  limit = 20,
 }: PostsListContainerProps = {}) {
   const currentUserId = await getCurrentUserId();
 
-  // ビューに応じてデータを取得
-  const posts =
-    view === "my" ? await getMyPosts() : await getAllPostsWithMetadata();
+  // ページネーション対応の投稿取得
+  const paginationResult = await getPostsPaginated(page, limit, view);
+  const { posts, totalPages, currentPage, hasNext, hasPrevious } =
+    paginationResult;
 
-  // メタデータを一括取得（いいね数、コメント数、タグなど）
+  // 表示分のpostIdのみでメタデータを取得（最大20件なのでHTTP 431エラー回避）
   const postIds = posts.map((post) => post.id);
   const postsMetadata = await getBulkPostMetadata(postIds);
 
@@ -39,6 +41,12 @@ export async function PostsListContainer({
       posts={postsWithMetadata}
       currentView={view}
       canEdit={!!currentUserId}
+      pagination={{
+        currentPage,
+        totalPages,
+        hasNext,
+        hasPrevious,
+      }}
     />
   );
 }

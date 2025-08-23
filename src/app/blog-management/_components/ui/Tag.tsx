@@ -7,6 +7,7 @@ interface TagProps {
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function Tag({
@@ -16,6 +17,7 @@ export function Tag({
   onClick,
   children,
   className = "",
+  style: customStyle,
 }: TagProps) {
   const baseClasses =
     "font-medium rounded-full inline-flex items-center justify-center transition-colors";
@@ -39,7 +41,7 @@ export function Tag({
     .trim()
     .replace(/\s+/g, " ");
 
-  const style = selected
+  const defaultStyle = selected
     ? {
         backgroundColor: tagColor,
         color: "#ffffff",
@@ -50,6 +52,8 @@ export function Tag({
         color: tagColor,
         border: `1px solid ${tagColor}40`,
       };
+
+  const style = { ...defaultStyle, ...customStyle };
 
   const Element = onClick ? "button" : "span";
 

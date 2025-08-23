@@ -1,7 +1,7 @@
 "use server";
 
 import { and, count, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { getCurrentUserId, requireAuth } from "@/lib/auth-server";
 import { db } from "@/lib/db";
@@ -69,6 +69,7 @@ export async function toggleLike(formData: FormData) {
 
     revalidatePath(`/blog-management/${validatedData.postId}`);
     revalidatePath("/blog-management");
+    revalidateTag("posts-metadata");
 
     return {
       success: true,

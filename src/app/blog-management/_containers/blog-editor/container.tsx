@@ -29,15 +29,17 @@ export async function BlogEditorContainer({
   ]);
 
   // 編集モードの場合は投稿データを取得
-  let initialData: {
-    id: string;
-    title: string;
-    content: string;
-    excerpt: string;
-    published: boolean;
-    categoryId: string | null;
-    tagIds: string[];
-  } | undefined = undefined;
+  let initialData:
+    | {
+        id: string;
+        title: string;
+        content: string;
+        excerpt: string;
+        published: boolean;
+        categoryId: string | null;
+        tagIds: string[];
+      }
+    | undefined;
   let isOwner = true;
 
   if (mode === "edit" && postId) {

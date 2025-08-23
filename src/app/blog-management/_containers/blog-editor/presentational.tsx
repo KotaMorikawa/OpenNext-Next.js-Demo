@@ -74,7 +74,17 @@ export function BlogEditorPresentation({
           formDataParam.append("id", initialData.id);
           await updatePost(formDataParam);
         }
-      } catch (error) {
+        // 成功時は何もしない（Server Actionがリダイレクト処理）
+      } catch (error: any) {
+        // エラーメッセージに「NEXT_REDIRECT」が含まれる場合は無視
+        if (
+          error?.message?.includes("NEXT_REDIRECT") ||
+          error?.digest?.includes("NEXT_REDIRECT")
+        ) {
+          return; // リダイレクトは成功している
+        }
+
+        // 本当のエラーのみ表示
         console.error("投稿エラー:", error);
         alert(
           `投稿の${mode === "create" ? "作成" : "更新"}に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`,
@@ -92,7 +102,17 @@ export function BlogEditorPresentation({
         formData.append("id", initialData.id);
         await deletePost(formData);
         setShowDeleteConfirm(false);
-      } catch (error) {
+      } catch (error: any) {
+        // エラーメッセージに「NEXT_REDIRECT」が含まれる場合は無視
+        if (
+          error?.message?.includes("NEXT_REDIRECT") ||
+          error?.digest?.includes("NEXT_REDIRECT")
+        ) {
+          setShowDeleteConfirm(false); // モーダルを閉じる
+          return; // リダイレクトは成功している
+        }
+
+        // 本当のエラーのみ表示
         console.error("削除エラー:", error);
         alert(
           `投稿の削除に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`,
@@ -287,11 +307,6 @@ export function BlogEditorPresentation({
               >
                 公開する
               </label>
-              <input
-                type="hidden"
-                name="published"
-                value={formData.published.toString()}
-              />
             </div>
             <p className="mt-1 text-sm text-gray-500">
               チェックを外すと下書きとして保存されます

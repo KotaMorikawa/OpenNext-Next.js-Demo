@@ -10,12 +10,19 @@ type PostsListPresentationProps = {
   posts: PostData[];
   currentView: "all" | "my";
   canEdit: boolean;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
 };
 
 export function PostsListPresentation({
   posts,
   currentView,
   canEdit,
+  pagination,
 }: PostsListPresentationProps) {
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all");
 
@@ -119,6 +126,78 @@ export function PostsListPresentation({
           <PostCard key={post.id} post={post} canEdit={canEdit} />
         ))}
       </div>
+
+      {/* ページネーション */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="mt-12 flex items-center justify-center space-x-4">
+          {/* 前のページ */}
+          {pagination.hasPrevious ? (
+            <Link
+              href={`/blog-management?view=${currentView}&page=${pagination.currentPage - 1}`}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            >
+              前のページ
+            </Link>
+          ) : (
+            <span className="px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
+              前のページ
+            </span>
+          )}
+
+          {/* ページ番号 */}
+          <div className="flex items-center space-x-2">
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+              .filter((pageNum) => {
+                // 現在のページの前後2ページまで表示
+                const current = pagination.currentPage;
+                return (
+                  pageNum === 1 ||
+                  pageNum === pagination.totalPages ||
+                  (pageNum >= current - 2 && pageNum <= current + 2)
+                );
+              })
+              .map((pageNum, index, array) => {
+                // 省略記号の表示判定
+                const prevNum = index > 0 ? array[index - 1] : 0;
+                const showEllipsis = pageNum - prevNum > 1;
+
+                return (
+                  <div key={pageNum} className="flex items-center">
+                    {showEllipsis && (
+                      <span className="px-2 text-gray-500">...</span>
+                    )}
+                    {pageNum === pagination.currentPage ? (
+                      <span className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium">
+                        {pageNum}
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/blog-management?view=${currentView}&page=${pageNum}`}
+                        className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        {pageNum}
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* 次のページ */}
+          {pagination.hasNext ? (
+            <Link
+              href={`/blog-management?view=${currentView}&page=${pagination.currentPage + 1}`}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            >
+              次のページ
+            </Link>
+          ) : (
+            <span className="px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
+              次のページ
+            </span>
+          )}
+        </div>
+      )}
 
       {/* 投稿なし */}
       {filteredPosts.length === 0 && (
