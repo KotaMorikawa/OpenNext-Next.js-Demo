@@ -34,10 +34,18 @@ export async function FeatureShowcaseContainer() {
       {
         title: "並行ルート",
         description: "Parallel Routesと@slotsを使った並行レンダリング",
-        href: "/dashboard",
+        href: "/parallel-test",
         icon: "🔀",
         color: "bg-purple-50 hover:bg-purple-100",
         textColor: "text-purple-900",
+      },
+      {
+        title: "N+1問題検証",
+        description: "DataLoaderでN+1問題を解決するパフォーマンス検証",
+        href: "/n1-verification",
+        icon: "📊",
+        color: "bg-orange-50 hover:bg-orange-100",
+        textColor: "text-orange-900",
       },
     ],
   };

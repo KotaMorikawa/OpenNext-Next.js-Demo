@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import ApiDemoSection from "../_components/ApiDemoSection";
 import CodeExamplesSection from "../_components/CodeExamplesSection";
-import DataSeedingSection from "../_components/DataSeedingSection";
 import OverviewSection from "../_components/OverviewSection";
 import PerformanceComparisonSection from "../_components/PerformanceComparisonSection";
 
@@ -12,8 +10,6 @@ export default function N1VerificationContainer() {
 
   const tabs = [
     { id: "overview", label: "概要", icon: "📖" },
-    { id: "seeding", label: "データ準備", icon: "🌱" },
-    { id: "api-demo", label: "API デモ", icon: "🔧" },
     { id: "performance", label: "パフォーマンス比較", icon: "📊" },
     { id: "code-examples", label: "コード例", icon: "💻" },
   ];
@@ -44,8 +40,6 @@ export default function N1VerificationContainer() {
       {/* タブコンテンツ */}
       <div className="mt-8">
         {activeTab === "overview" && <OverviewSection />}
-        {activeTab === "seeding" && <DataSeedingSection />}
-        {activeTab === "api-demo" && <ApiDemoSection />}
         {activeTab === "performance" && <PerformanceComparisonSection />}
         {activeTab === "code-examples" && <CodeExamplesSection />}
       </div>
