@@ -39,12 +39,14 @@ npm run format       # Biomeフォーマット実行
 npm run typecheck    # TypeScript型チェック
 ```
 
-### デプロイ (SST)
-```bash
-sst dev             # SST開発環境
-sst deploy          # AWSデプロイ
-sst remove          # AWSリソース削除
-```
+### テスト戦略
+- `npm run test`でVitestを使用してテスト
+- テスト環境はjsdomで構成
+- セットアップファイル: `test/setup.ts`
+- テストはコンポーネントと同じ場所に配置（例：`app/page.test.tsx`）
+- テストはAAAパターン（Arrange, Act, Assert）で記述
+- 詳細は`docs/testing/frontend-unit-testing.md`を参照
+
 
 ## アーキテクチャ
 
@@ -54,31 +56,6 @@ sst remove          # AWSリソース削除
 - **テスト**: Vitest + Playwright
 - **インフラ**: SST 3.17.10 (AWS Lambda + CloudFront)
 - **コード品質**: Biome 2.2.0 (Lint + Format)
-
-### ディレクトリ構造
-```
-src/
-├── app/            # App Router構造
-│   ├── layout.tsx  # ルートレイアウト
-│   ├── page.tsx    # ホームページ
-│   ├── globals.css # グローバルCSS
-│   └── favicon.ico # ファビコン
-├── lib/
-│   ├── db/         # データベース (Drizzle ORM)
-│   │   ├── schema.ts
-│   │   └── index.ts
-│   └── ...
-└── components/     # React コンポーネント
-
-scripts/            # データベース初期化スクリプト
-test/               # テスト設定
-docs/               # プロジェクドキュメント
-public/             # 静的ファイル
-docker-compose.yml  # PostgreSQL環境
-drizzle.config.ts   # Drizzle設定
-sst.config.ts       # SST設定
-TASK.md            # 機能検証タスクリスト
-```
 
 ## コーディング規約
 
@@ -92,144 +69,82 @@ TASK.md            # 機能検証タスクリスト
 - 自動インポート整理有効
 - Next.js/React推奨ルール適用
 
-## 重要な注意点
+## ドキュメント・ナレッジベース
+`docs/`ディレクトリには、Next.js App Routerとテストのベストプラクティスドキュメントがあります。
 
-### SST設定
-- 本番環境: リソース保護有効 (`protect: true`)
-- ステージング環境: 自動削除設定 (`removal: "remove"`)
+### ドキュメント構成
 
-### 開発フロー
-1. `npm run db:up` でPostgreSQL起動
-2. `npm run dev` で開発サーバー起動
-3. コード変更後:
-   - `npm run lint` でエラーがないことを確認
-   - `npm run typecheck` で型チェック
-   - `npm run test` でテスト実行
-   - `npm run build` でビルドが成功することを確認
-4. Git操作前に上記チェック必須
+#### 1. Next.js基本原理ガイド (`nextjs-principle/`)
+Next.js App Routerの包括的なガイド（全36章、5部構成）：
 
-### Next.js v15機能検証
-- **Phase 1**: ローカル開発 (`npm run dev`)
-- **Phase 2**: SST開発環境 (`sst dev`)  
-- **Phase 3**: 本番環境 (`sst deploy`)
-- 詳細: `TASK.md` 参照
+**Part 1: データ取得 (11章)**
+- **参照タイミング**: データ取得パターンを実装する際
+- **主要ファイル**:
+  - `part_1_server_components.md` - Server Components設計の基本
+  - `part_1_colocation.md` - データ取得の配置戦略
+  - `part_1_request_memoization.md` - リクエスト最適化
+  - `part_1_concurrent_fetch.md` - 並行データ取得
+  - `part_1_data_loader.md` - DataLoaderパターン
+  - `part_1_fine_grained_api_design.md` - API設計戦略
+  - `part_1_interactive_fetch.md` - インタラクティブなデータ取得
 
-### フォントシステム
-Geistフォントファミリーを使用（next/font経由で最適化）
+**Part 2: コンポーネント設計 (5章)**
+- **参照タイミング**: コンポーネント設計・リファクタリング時
+- **主要ファイル**:
+  - `part_2_client_components_usecase.md` - Client Components使用指針
+  - `part_2_composition_pattern.md` - コンポジションパターン
+  - `part_2_container_presentational_pattern.md` - Container/Presentational分離
+  - `part_2_container_1st_design.md` - Container優先設計
 
-## 模範的ディレクトリ構成原則
+**Part 3: キャッシュ戦略 (6章)**
+- **参照タイミング**: パフォーマンス最適化・キャッシュ制御時
+- **主要ファイル**:
+  - `part_3_static_rendering_full_route_cache.md` - 静的レンダリング最適化
+  - `part_3_dynamic_rendering_data_cache.md` - 動的レンダリング制御
+  - `part_3_router_cache.md` - クライアントサイドキャッシュ
+  - `part_3_data_mutation.md` - データ変更とキャッシュ無効化
+  - `part_3_dynamicio.md` - 実験的キャッシュ改善
 
-### コンポーネント配置戦略
+**Part 4: レンダリング戦略 (4章)**
+- **参照タイミング**: レンダリング最適化・Streaming実装時
+- **主要ファイル**:
+  - `part_4_pure_server_components.md` - Server Component純粋性
+  - `part_4_suspense_and_streaming.md` - プログレッシブローディング
+  - `part_4_partial_pre_rendering.md` - 部分的事前レンダリング
 
-#### 1. プライベートフォルダ規約（`_`プレフィックス）
-```
-_components/    # そのルートでのみ使用するローカルコンポーネント
-_containers/    # Container/Presentationalパターンの実装
-_lib/          # ルート固有のユーティリティやヘルパー
-```
+**Part 5: その他の実践 (4章)**
+- **参照タイミング**: 認証・エラーハンドリング実装時
+- **主要ファイル**:
+  - `part_5_request_ref.md` - リクエスト・レスポンス参照
+  - `part_5_auth.md` - 認証・認可パターン
+  - `part_5_error_handling.md` - エラーハンドリング戦略
 
-#### 2. Container/Presentationalパターン
-```
-_containers/
-└── feature-name/
-    ├── index.tsx           # エクスポート専用
-    ├── container.tsx       # ビジネスロジック・状態管理
-    └── presentational.tsx  # UI表現・プロップス受け取り
-```
+#### 2. テストドキュメント (`testing/`)
+**フロントエンド単体テスト** (`testing/frontend-unit-testing.md`)
+- **参照タイミング**: テスト戦略策定・テスト実装時
+- **内容**:
+  - Classical vs London school テスト手法
+  - AAA（Arrange, Act, Assert）パターン
+  - Storybookとの統合（`composeStories`）
+  - テスト命名規則・共通セットアップパターン
 
-#### 3. ファイル配置の判断基準
+### 参照ガイドライン
 
-**ローカルコンポーネント（`_components/`）の配置基準：**
-- そのルートでのみ使用
-- 特定の機能に密結合
-- 他のルートでの再利用が想定されない
+**参照タイミング**:
+- 実装時には関連するドキュメントを必ず参照する
+- ドキュメントを参照したら、「📖{ドキュメント名}を読み込みました」と出力すること
 
-**共通コンポーネント（`src/components/`）の配置基準：**
-- 複数のルートで使用
-- 汎用的なUI要素（Header、Footer、Navigationなど）
-- プロジェクト全体で統一されたデザインシステム
+**機能実装時の参照優先順位**:
+1. **データ取得実装** → Part 1のドキュメント群を参照
+2. **コンポーネント設計** → Part 2のパターンを適用
+3. **パフォーマンス最適化** → Part 3のキャッシュ戦略を活用
+4. **レンダリング最適化** → Part 4のStreaming・PPR戦略を参照
+5. **認証・エラーハンドリング** → Part 5の実践パターンを適用
+6. **テスト実装** → `testing/frontend-unit-testing.md`を参照
 
-**ユーティリティ（`_lib/`）の配置基準：**
-- そのルート固有のデータ取得ロジック
-- ルート固有のバリデーション
-- 特定の機能領域に特化したヘルパー
+### 重要な設計原則
 
-**`_lib/` 内部の推奨ディレクトリ構成：**
-```
-_lib/
-├── fetchers/       # データ取得ロジック
-├── actions/        # Server Actions・フォームアクション
-├── validators/     # バリデーションルール
-├── utils/          # ヘルパー関数
-└── types/          # ルート固有の型定義
-```
-
-### App Router高度機能の活用
-
-#### 並列ルート（`@`プレフィックス）
-```
-dashboard/
-├── @sidebar/       # サイドバー並列ルート
-├── @modal/         # モーダル並列ルート
-├── layout.tsx      # 並列ルートを統合
-└── page.tsx        # メインコンテンツ
-```
-
-#### 動的ルート配置
-```
-posts/
-├── [id]/           # 動的ルート
-├── _containers/    # posts機能専用コンテナ
-├── _lib/          # posts機能専用ユーティリティ
-└── page.tsx       # 一覧ページ
-```
-
-### 段階的詳細化の原則
-
-**ファイル構成の階層**：
-1. `index.tsx` - 機能のエントリーポイント
-2. `container.tsx` - ビジネスロジックと状態管理
-3. `presentational.tsx` - UI表現とプロップス
-
-**ディレクトリ構成の階層**：
-1. ルートレベル（`src/app/feature/`）
-2. 機能分割（`_containers/specific-feature/`）
-3. 実装詳細（`container.tsx`, `presentational.tsx`）
-
-### ドキュメント駆動開発
-
-#### プロジェクト指針ファイル
-```
-docs/               # 設計原則・開発指針
-CLAUDE.md          # AI開発支援ガイド
-README.md          # プロジェクト概要
-TASK.md           # 機能検証タスクリスト
-```
-
-#### 配置の判断基準
-- **技術的詳細** → `docs/`
-- **開発ワークフロー** → `CLAUDE.md`
-- **プロジェクト概要** → `README.md`
-- **進捗管理** → `TASK.md`
-
-### 開発時の配置判断フロー
-
-```
-新しいファイルを作成する際の判断：
-
-1. 既存のルートで使用？
-   ├─ Yes → そのルートの_components/へ
-   └─ No → 2へ
-
-2. 複数のルートで使用予定？
-   ├─ Yes → src/components/へ
-   └─ No → そのルートの_components/へ
-
-3. ビジネスロジックを含む？
-   ├─ Yes → _containers/でContainer/Presentational分離
-   └─ No → _components/でシンプルなコンポーネント
-
-4. データ取得やユーティリティ？
-   ├─ ルート固有 → _lib/へ
-   └─ 汎用的 → src/lib/へ
-```
+- **Server-First**: Server Componentsを優先し、必要時にClient Componentsを使用
+- **データ取得の配置**: データを使用するコンポーネントの近くでデータ取得を実行
+- **コンポジション**: 適切なコンポーネント分離とコンポジションパターンの活用
+- **プログレッシブ強化**: JavaScript無効時でも機能する設計を心がける
